@@ -142,7 +142,7 @@ def arbitrage(cycle_num=5, cycle_time=240):
                 exch_rate_list.append(time.time())      #change to Human Readable time
                 print(exch_rate_list)
                 #Compare to determine if Arbitrage opp exists
-                if exch_rate_list[0]<exch_rate_list[1]/exch_rate_list[2]:
+                if exch_rate_list[0]<exch_rate_list[1]/exch_rate_list[2] and ((exch_rate_list[1]/exch_rate_list[2]) - exch_rate_list[0] > (5 * fee_percentage)):
                     print("Arbitrage Possibility")
                 else:
                     print("No Arbitrage Possibility")
@@ -354,7 +354,7 @@ def market_depth(sym, exchange=ccxt.binance(), num_entries=20):
     exchange.verbose = True
     depth = exchange.fetch_order_book(symbol=sym)               #Transf'd to CCXT
     #pprint(depth)
-    print(depth['asks'][0]) 
+    print(depth['asks'][0])
     ask_tot=0.0
     ask_price =[]
     ask_quantity = []
