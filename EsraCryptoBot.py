@@ -17,11 +17,11 @@ async def run():
 
 async def arbitrage(cycle_num=5, cycle_time=1):
 	print("\n\n ----------------------------------- \n\n")
-	print("Esra Unified Crypto Arbitrage Finder Running....")
+	print("\n\n Esra Unified Crypto Arbitrage Finder Running....\n\n")
+	print("Copyright 2020 Esra Systems LLC")
 	time.sleep(2)
 	fee_percentage = 0.001          #divided by 100
-	coins = ['BTC', 'LTC', 'ETH']   #Coins to Arbitrage
-	# Create Functionality for Binance
+
 	for exch in ccxtpro.exchanges:    #initialize Exchange
 		exchange1 = getattr (ccxtpro, exch) () 
 		try:
