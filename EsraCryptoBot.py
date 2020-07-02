@@ -18,7 +18,7 @@ async def run():
 async def arbitrage(cycle_num=5, cycle_time=1):
 	print("\n\n ----------------------------------- \n\n")
 	print("\n\n Esra Unified Crypto Arbitrage Finder Running....\n\n")
-	print("Copyright 2020 Esra Systems LLC")
+	print("Copyright 2020 Esra Systems All Rights Reserved")
 	time.sleep(2)
 	fee_percentage = 0.001          #divided by 100
 
@@ -56,7 +56,8 @@ async def arbitrage(cycle_num=5, cycle_time=1):
 					print('hello')
 					if j >= 1:
 						if len(arb_list) > 1:
-							final = arb_list[0][-3:]  + '/' + str(arb_list[1][-3:])
+							print
+							final = arb_list[0].split('/')[1]  + '/' + str(arb_list[1].split('/')[1])
 							print(final)
 							# if final in symbols:
 							arb_list.append(final)
@@ -74,7 +75,7 @@ async def arbitrage(cycle_num=5, cycle_time=1):
 						else:
 							if j % 2 == 0:
 								# print("{} , {}".format(arb_list[j][0:3], sym[0:3]))
-								if arb_list[j][0:3] == sym[0:3]:
+								if arb_list[j].split('/')[0] == sym.split('/')[0]:
 									print('EASYMONNNEEYYY')
 									if arb_list[j] == sym:
 										print('HOLLAAAA')
@@ -88,7 +89,7 @@ async def arbitrage(cycle_num=5, cycle_time=1):
 								else:
 									pass
 							if j % 2 == 1:
-								if arb_list[j][-3:] == sym[-3:]:
+								if arb_list[j].split(',')[1] == sym.split(',')[1]:
 									if arb_list[j] == sym:
 										pass
 									else:
