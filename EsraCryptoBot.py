@@ -18,7 +18,7 @@ async def run():
     arbitrageopp = arbitrageopp()
 
 
-def execute_all_tri_arb_orders(fee_percentage = .001):
+def execute_all_tri_arb_orders():
     print("\n\n ----------------------------------- \n\n")
     print("\n\n Esra Unified Crypto Arbitrage Finder Running....\n\n")
     print("Copyright 2020 Esra Systems All Rights Reserved")
@@ -111,7 +111,7 @@ def execute_all_tri_arb_orders(fee_percentage = .001):
 
 #asyncio.get_event_loop().run_until_complete(run())
 
-def find_tri_arb_opp (exchange, arb_list, fee_percentage = .001):
+def find_tri_arb_opp(exchange, arb_list, fee_percentage = .001):
     # Determine Rates for our 3 currency pairs - order book
     opp_exch_rate_list = []
     opp_quantity_list = []
@@ -208,20 +208,20 @@ def maxBid(exchange, market, min_USD_for_trade=100):
                 price_quantity = {
                     'bid_price': rounded_bid_price,
                     'bid_quantity': rounded_bid_quantity,
-                    'isFound': true
+                    'isFound': True
                 }
                 return price_quantity
         price_quantity = {
             'bid_price': rounded_bid_price,
             'bid_quantity': rounded_bid_quantity,
-            'isFound': false
+            'isFound': False
         }
         return price_quantity
     except:
         price_quantity = {
             'bid_price': 0,
             'bid_quantity': 0,
-            'isFound': false
+            'isFound': False
         }
         return price_quantity
 
@@ -239,20 +239,20 @@ def minAsk(exchange, market, min_USD_for_trade = 100):
                 price_quantity = {
                     'ask_price': rounded_ask_price,
                     'bid_price': rounded_ask_quantity,
-                    'isFound': true
+                    'isFound': True
                 }
                 return price_quantity
         price_quantity = {
             'ask_price': rounded_ask_price,
             'bid_price': rounded_ask_quantity,
-            'isFound': false
+            'isFound': False
         }
         return price_quantity
     except:
         price_quantity = {
             'ask_price': 0,
             'bid_price': 0,
-            'isFound': false
+            'isFound': False
         }
         return price_quantity
 
