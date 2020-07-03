@@ -5,9 +5,6 @@ import random
 from pprint import pprint
 import asyncio
 
-transfer_symbol = 'USDC'
-amount_digits_rounded = 5
-
 
 async def run():
     # exchange = ccxtpro.binance()
@@ -18,11 +15,11 @@ async def run():
     arbitrageopp = arbitrageopp()
 
 
-def execute_all_tri_arb_orders(fee_percentage = .001):
+def execute_all_tri_arb_orders(cfee_percentage = .001):
     print("\n\n ----------------------------------- \n\n")
     print("\n\n Esra Unified Crypto Arbitrage Finder Running....\n\n")
     print("Copyright 2020 Esra Systems All Rights Reserved")
-    time.sleep(2)
+    time.sleep(2)  # divided by 100
 
     for exch in ccxtpro.exchanges:  # initialize Exchange
         exchange1 = getattr(ccxtpro, exch)()
@@ -101,17 +98,14 @@ def execute_all_tri_arb_orders(fee_percentage = .001):
             print("List of Arbitrage Symbols:", list_of_arb_lists)
 
             for arb_list in list_of_arb_lists:
-                arbitrageopp = find_tri_arb_opp(exchange, arb_list)
+                arbitrageopp = find_tri_arb_opp (exchange, arb_list)
                 if(arbitrageopp['profit'] > 0.0):
                     quantity_list = arbitrageopp['quantity_list']
                     pre_tri_arb_USD_transfer(arbitrageopp['exchange'], arbitrageopp['sym_list'], arbitrageopp['fee_percentage'], arbitrage[quantity_list[0]])
-                    quantity_3 = tri_arb_orders(arbitrageopp['exch_rate_list'], arbitrageopp['sym_list'], arbitrageopp['quantity_list'], arbitrage['fee_percentage'])
-                    post_tri_arb_USD_transfer(arbitrageopp['exchange'],  arbitrageopp['sym_list'], arbitrageopp['fee_percentage'], quantity_3)
-                    print("Everything is complete")
 
 #asyncio.get_event_loop().run_until_complete(run())
 
-def find_tri_arb_opp (exchange, arb_list, fee_percentage = .001):
+def find_tri_arb_opp (exchange, arb_list):
     # Determine Rates for our 3 currency pairs - order book
     opp_exch_rate_list = []
     opp_quantity_list = []
@@ -193,18 +187,20 @@ def find_tri_arb_opp (exchange, arb_list, fee_percentage = .001):
     }
     return arbitrage
 
+# make exchange, exch_rate_list, sym_list, fee_percentage global vars
+#TAB ERRORS UGHHGG
 def maxBid(exchange, market, min_USD_for_trade=100):
     price_quantity = {}
     USDCmarket = market[0:3] + "/USDC"
     USDCdepth = exchange.fetch_order_book(symbol=USDCmarket)
     try:
         # minimum quantity that will determine the correct bid price
-        min_quantity = round(float(min_USD_for_trade/(USDCdepth['bids'][0][0])), amount_digits_rounded)
+        min_quantity = round(float(min_USD_for_trade/(USDCdepth['bids'][0][0])), 5)
         depth = exchange.fetch_order_book(symbol=market)
         for bid in depth['bids']:
             if bid[1] > min_quantity:
-                rounded_bid_price = round(float(bid[0]),amount_digits_rounded)
-                rounded_bid_quantity = round(float(bid[1]),amount_digits_rounded)
+                rounded_bid_price = round(float(bid[0]),5)
+                rounded_bid_quantity = round(float(bid[1]),5)
                 price_quantity = {
                     'bid_price': rounded_bid_price,
                     'bid_quantity': rounded_bid_quantity,
@@ -230,12 +226,12 @@ def minAsk(exchange, market, min_USD_for_trade = 100):
     USDCmarket = market[0:3] + "/USDC"
     USDCdepth = exchange.fetch_order_book(symbol = USDCmarket) #checking the price of a coin in dollars
     try:
-        min_quantity = round(float(min_USD_for_trade/(USDCdepth['asks'][0][0])), amount_digits_rounded) #minimum quantity that will determine the correct bid price
+        min_quantity = round(float(min_USD_for_trade/(USDCdepth['asks'][0][0])), 5) #minimum quantity that will determine the correct bid price
         depth = exchange.fetch_order_book(symbol = market)
         for ask in depth['asks']:
             if ask[1] > min_quantity:
-                rounded_ask_price = round(float(ask[0]),amount_digits_rounded)
-                rounded_ask_quantity = round(float(ask[1]),amount_digits_rounded)
+                rounded_ask_price = round(float(ask[0]),5)
+                rounded_ask_quantity = round(float(ask[1]),5)
                 price_quantity = {
                     'ask_price': rounded_ask_price,
                     'bid_price': rounded_ask_quantity,
@@ -261,10 +257,13 @@ def pre_tri_arb_USD_transfer(exchange, sym_list, fee_percentage, initial_quantit
     USDmarket = market1[0:3] + "/USDC"
     print("Transferring capital in USDC to " + market1)
     depth = exchange.fetch_order_book(symbol = USDmarket)
-    USD_sell_exch_rate = round(maxBid(exchange, market1) ['bid_price']) #is this the highest volume in the bid order book... should it be a limit or market order?
+    USD_sell_exch_rate = round(maxBid(exchange, market1)) #is this the highest volume in the bid order book... should it be a limit or market order?
+    print(USD_sell_exch_rate)
     non_fee_adjusted_quantity = initial_quantity/USD_sell_exch_rate
+    print(non_fee_adjusted_quantity)
     totalprice = non_fee_adjusted_quantity * USD_sell_exch_rate
     fee_adjusted_quantity = (totalprice + (totalprice * fee_percentage)) / USD_sell_exch_rate
+    print(fee_adjusted_quantity)
     pre_USD_transfer_order = client.create_order(symbol=USDmarket,
                         side=SIDE_SELL,
                         type=ORDER_TYPE_LIMIT,
@@ -273,19 +272,21 @@ def pre_tri_arb_USD_transfer(exchange, sym_list, fee_percentage, initial_quantit
                         timeInForce=TIME_IN_FORCE_GTC)
     print("Pre Tri Arb Coin Transfer Complete")
 
-def tri_arb_orders(exch_rate_list, sym_list, quantity_list, fee_percentage): #exch_rate_list is the exchange rates for the tri arb, sym_list are the 3 markets in the tri arb
+def tri_arb_orders(exch_rate_list, quantity_list, sym_list): #exch_rate_list is the exchange rates for the tri arb, sym_list are the 3 markets in the tri arb
     # Place 3 orders in succession buying/selling coins for the tri arb
     print("PLACING ORDER")
     # Round Coin Amounts of Binance Coin (must be purchased in whole amounts)
-    # for a, sym in enumerate(sym_list):
-    #     print(sym)
-    #     if sym[0:3]=='BNB' or sym[-3:]=='BNB':
-    #         coin_amts[a+1] = math.ceil(coin_amts[a+1])
-    #         print(coin_amts[a])
+    for a, sym in enumerate(list_of_sym):
+        print(sym)
+        if sym[0:3]=='BNB' or sym[-3:]=='BNB':
+            coin_amts[a+1] = math.ceil(coin_amts[a+1])
+            print(coin_amts[a])
+    real_order_msg1 += "Coin Amounts to Purchase: "+str(coin_amts)
+    print(real_order_msg1)
     real_order_start_time = datetime.now()
     real_order_msg1+="\nSTART TIME: " + str(real_order_start_time)+"\n\n"
-    #First Order - Coin 2 from Starting Coin -
-    price_order_1 = round(float(exch_rate_list[int(0)]),amount_digits_rounded)
+    # First Order - Coin 2 from Starting Coin -
+    price_order_1 = round(float(exch_rate_list[int(0)]),5)
     initial_quantity_traded = quantity_list[0]
     order_1 = client.create_order (symbol=sym_list[0],
                         side=SIDE_SELL,
@@ -293,43 +294,35 @@ def tri_arb_orders(exch_rate_list, sym_list, quantity_list, fee_percentage): #ex
                         quantity=initial_quantity_traded,
                         price=price_order_1,
                         timeInForce=TIME_IN_FORCE_GTC)
-    print('Tri Arb Order 1 Complete')
-    #Second Order - Coin 3 from Coin 2 -
-    price_order_2 = round(1/exch_rate_list[int(1)], amount_digits_rounded)
-    non_fee_adjusted_quantity_2 = initial_quantity_traded/exch_rate_list[0]
-    totalprice_1 = non_fee_adjusted_quantity_2 * exch_rate_list[0]
-    fee_adjusted_quantity_2 = round((totalprice - (totalprice * fee_percentage)) / exch_rate_list[0], amount_digits_rounded)
+    real_order_msg1 += str(order_1) +'\n'+str(quantity_1)
+
+    price_order_2 = round(1/exch_rate_list[int(1)], 5)
+    quantity_2 = quantity_list[1] #NEEDS TO INCLUDE FEES
     order_2 = client.create_order (symbol=sym_list[1],
                         side=SIDE_BUY,
                         type=ORDER_TYPE_LIMIT,
-                        quantity=fee_adjusted_quantity_2,
+                        quantity=quantity_2,
                         price=price_order_2,
                         timeInForce=TIME_IN_FORCE_GTC)
-    print('Tri Arb Order 2 Complete')
-    #Third Order - Starting Coin from Coin 3 -
-    price_order_3 = round(float(exch_rate_list[int(2)]),amount_digits_rounded)
-    non_fee_adjusted_quantity_3 = fee_adjusted_quantity_2/exch_rate_list[1]
-    totalprice_2 = non_fee_adjusted_quantity_3 * exch_rate_list[1]
-    fee_adjusted_quantity_3 = round((totalprice_2 - (totalprice_2 * fee_percentage)) / exch_rate_list[1], amount_digits_rounded)
+    real_order_msg1 += str(order_2)+'\n'+str(quantity_2)
+    real_order_msg1 += "\n\nREAL ORDER SELL: \n"
+    price_order_3 = round(float(exch_rate_list[int(2)]),5)
+    quantity_3 = round(coin_amts[3], 5)
     order_3 = client.create_order (symbol=sym_list[2],
                         side=SIDE_SELL,
                         type=ORDER_TYPE_LIMIT,
-                        quantity=fee_adjusted_quantity_3,
+                        quantity=quantity_3,
                         price=price_order_3,
                         timeInForce=TIME_IN_FORCE_GTC)
-    print('Tri Arb Order 3 Complete')
-    print('All Tri Arb Orders Complete')
-    return fee_adjusted_quantity_3
+    list_of_orders = [order_1, order_2, order_3]
+        # plc_order_msg = "Placing Order: "+ str(order)
 
 def post_tri_arb_USD_transfer(exchange,  sym_list, fee_percentage, quantity_3):
     market1 = sym_list[0]
     USDmarket = market1[0:3] + "/USDC"
     print("Transfering capital in " + USDmarket + " to USDC")
     depth = exchange.fetch_order_book(symbol = USDmarket)
-    USD_buy_exch_rate = round(minAsk(exchange, market1) ['ask_price'])
-    non_fee_adjusted_quantity = quantity_3 / USD_buy_exch_rate
-    totalprice = non_fee_adjusted_quantity * USD_buy_exch_rate
-    fee_adjusted_quantity = (totalprice - (totalprice * fee_percentage)) / USD_sell_exch_rate
+    USD_buy_exch_rate = round(minAsk(exchange, market1))
     post_USD_transfer_order = client.create_order(symbol=USDmarket,
                         side=SIDE_BUY,
                         type=ORDER_TYPE_LIMIT,
