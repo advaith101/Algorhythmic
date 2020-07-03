@@ -99,7 +99,7 @@ def execute_all_tri_arb_orders():
             print("List of Arbitrage Symbols:", list_of_arb_lists)
 
             for arb_list in list_of_arb_lists:
-                arbitrageopp = find_tri_arb_opp(exchange, arb_list)
+                arbitrageopp = find_tri_arb_opp(exchange1, arb_list)
                 if(arbitrageopp['profit'] > 0.0):
                     quantity_list = arbitrageopp['quantity_list']
                     pre_tri_arb_USD_transfer(arbitrageopp['exchange'], arbitrageopp['sym_list'], arbitrageopp['fee_percentage'], arbitrage[quantity_list[0]])
@@ -107,7 +107,6 @@ def execute_all_tri_arb_orders():
                     post_tri_arb_USD_transfer(arbitrageopp['exchange'],  arbitrageopp['sym_list'], arbitrageopp['fee_percentage'], quantity_3)
                     print("Everything is complete")
 
-asyncio.get_event_loop().run_until_complete(run())
 
 def find_tri_arb_opp(exchange, arb_list, fee_percentage = .001):
     # Determine Rates for our 3 currency pairs - order book
@@ -121,9 +120,9 @@ def find_tri_arb_opp(exchange, arb_list, fee_percentage = .001):
         print("Cycle Number: ", k)
         for sym in arb_list:
             print(sym)
-            if sym in symbols:
+            if sym in exchange.symbols:
                 if i % 2 == 0:
-                    opp_max_bid_price_quantity = maxBid(exchange1, sym)
+                    opp_max_bid_price_quantity = maxBid(exchange, sym)
                     # assumed trade volume of $100
                     if opp_max_bid_price_quantity['isFound']:
                         exch_rate_list.append(opp_max_bid_price_quantity[0])
@@ -132,7 +131,7 @@ def find_tri_arb_opp(exchange, arb_list, fee_percentage = .001):
                         exch_rate_list.append(0)
 
                 else:
-                    opp_max_ask_price_quantity = minAsk(exchange1, sym)
+                    opp_max_ask_price_quantity = minAsk(exchange, sym)
                     # assumed trade volume of $100
                     if opp_max_ask_price_quantity['isFound']:
                         exch_rate_list.append(opp_max_bid_price_quantity[0])
@@ -158,7 +157,6 @@ def find_tri_arb_opp(exchange, arb_list, fee_percentage = .001):
                 print("No Arbitrage Possibility")
             # Format data (list) into List format (list of lists)
             list_exch_rate_list.append(exch_rate_list)
-            time.sleep(cycle_time)
 
         rateA = 0.0  # Original Exchange Rate
         rateB = 0.0  # Calculated/Arbitrage Exchange Rate
@@ -178,12 +176,12 @@ def find_tri_arb_opp(exchange, arb_list, fee_percentage = .001):
                 time_list = rate[3]
             print("Original Exchange Rate: {} \n Arbitrage Exchange Rate: {} \n Arbitrage Exchange Rate including Fees: {} \n Real Profit: {}".format(rateA, rateB, rateB_fee, profit))
         except:
-            print("No Arbitrage Possibility")
+            random=''
 
-    exchange1.close()
+    exchange.close()
     arbitrage = {
-        'exchange': opp_exchange,
-        'sym_list': opp_sym_list,
+        'exchange': exchange.id,
+        'sym_list': arb_list,
         'exch_rate_list': opp_exch_rate_list, #maxBid, minAsk, maxBid
         'profit': profit,
         'quantity_list': opp_quantity_list,
@@ -335,6 +333,8 @@ def post_tri_arb_USD_transfer(exchange,  sym_list, fee_percentage, quantity_3):
                         price=(1/USD_buy_exch_rate),
                         timeInForce=TIME_IN_FORCE_GTC)
     print("Post Tri Arb Coin Transfer Complete")
+
+asyncio.get_event_loop().run_until_complete(run())
 
 if __name__ == "__main__":
     run()
