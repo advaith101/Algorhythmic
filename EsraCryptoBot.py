@@ -1,6 +1,5 @@
 import ccxtpro
 import time
-import matplotlib.pyplot as plt
 import random
 from pprint import pprint
 import asyncio
@@ -14,13 +13,12 @@ async def run():
     # await exchange.load_markets()
     # test = exchange.symbols
     # print(test)
-
-    arbitrageopp = arbitrageopp()
+    execute_all_tri_arb_orders()
 
 
 def execute_all_tri_arb_orders():
     print("\n\n ----------------------------------- \n\n")
-    print("\n\n Esra Unified Crypto Arbitrage Finder Running....\n\n")
+    print("\n\nEsra Unified Crypto Arbitrage Finder Running....\n\n")
     print("Copyright 2020 Esra Systems All Rights Reserved")
     time.sleep(2)
 
@@ -109,7 +107,7 @@ def execute_all_tri_arb_orders():
                     post_tri_arb_USD_transfer(arbitrageopp['exchange'],  arbitrageopp['sym_list'], arbitrageopp['fee_percentage'], quantity_3)
                     print("Everything is complete")
 
-#asyncio.get_event_loop().run_until_complete(run())
+asyncio.get_event_loop().run_until_complete(run())
 
 def find_tri_arb_opp(exchange, arb_list, fee_percentage = .001):
     # Determine Rates for our 3 currency pairs - order book
