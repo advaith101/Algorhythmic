@@ -56,7 +56,7 @@ def arbitrage(cycle_num=5, cycle_time=240):
     fee_percentage = 0.001          #divided by 100
     coins = ['BTC', 'LTC', 'ETH']   #Coins to Arbitrage
     #Create Functionality for Binance
-    for exch in ccxt.exchanges:    #initialize Exchange
+    for exch in :    #initialize Exchange
         exchange1 = getattr (ccxt, exch) ()
         symbols = exchange1.symbols
         if symbols is None:
