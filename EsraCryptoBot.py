@@ -1,4 +1,4 @@
-import ccxt
+import ccxtpro
 import datetime
 import time
 import random
@@ -10,30 +10,36 @@ amount_digits_rounded = 5
 
 
 async def run():
-    # exchange = ccxt.binance()
+    # exchange = ccxtpro.binance()
     # await exchange.load_markets()
     # test = exchange.symbols
     # print(test)
-    execute_all_tri_arb_orders()
+    
+    list_of_lists_of_arb_lists = await config_arbitrages()
+    while 1:
+        profit_spread_list = await execute_all_tri_arb_orders(list_of_lists_of_arb_lists)
+        await compute_avg_spread(profit_spread_list)
+        print("CYCLE FINISHED, STARTING NEXT CYCLE...")
+        await asyncio.sleep(3)
 
-
-def execute_all_tri_arb_orders():
+async def config_arbitrages():
     print("\n\n ----------------------------------- \n\n")
     print("\n\nEsra Unified Crypto Arbitrage Finder Running....\n\n")
-    print("Copyright 2020 Esra Systems All Rights Reserved")
+    print("Copyright 2020 Esra Systems All Rights Reserved visit www.esrainvestments.com for more info\n\n")
+    print("\n\n ----------------------------------- \n\n")
     time.sleep(2)
     markets = {}
-
-    for exch in ccxt.exchanges:  # initialize Exchange
-        exchange1 = getattr(ccxt, exch)()
+    list_of_lists_of_arb_lists = []
+    for exch in ccxtpro.exchanges:  # initialize Exchange
+        exchange1 = getattr(ccxtpro, exch)()
         try:
-            val = exchange1.load_markets()
+            val = await exchange1.load_markets()
             markets = val.keys()
         except:
-            print('oh well')
-        print(exchange1)
+            print('\nExchange is not loading markets.. Moving on\n')
+        print("Exchange Name: {}".format(exchange1.id))
         symbols = exchange1.symbols
-        print(symbols)
+        # print(symbols)
         if symbols is None:
             print("Skipping Exchange ", exch)
             print("\n-----------------\nNext Exchange\n-----------------")
@@ -44,22 +50,22 @@ def execute_all_tri_arb_orders():
             exchange1_info = dir(exchange1)
             print("------------Exchange: ", exchange1.id)
             print(exchange1.symbols)  # List all currencies
-            time.sleep(5)
+            # time.sleep(5)
 
             list_of_arb_lists = []  # List of all arb triangles
+            list_of_arb_listswmarkets = []
             for symb in symbols:
                 arb_list = [symb]
-                print(arb_list)
+                # print(arb_list)
                 # Find 'triangle' of currency rate pairs
                 j = 0
                 proceed = True
                 while proceed:
-                    print('hello')
+                    # print('hello')
                     if j >= 1:
                         if len(arb_list) > 1:
-                            print
                             final = arb_list[0].split('/')[1] + '/' + str(arb_list[1].split('/')[1])
-                            print(final)
+                            # print(final)
                             # if final in symbols:
                             arb_list.append(final)
                             break
@@ -89,7 +95,7 @@ def execute_all_tri_arb_orders():
                                         pass
                                     else:
                                         arb_list.append(sym)
-                                        print(arb_list)
+                                        # print(arb_list)
                                         j += 1
                                         print('ho')
                                         break
@@ -99,91 +105,120 @@ def execute_all_tri_arb_orders():
                     # proceed = False
                 if len(arb_list) > 2:
                     if arb_list[0] in markets and arb_list[1] in markets and arb_list[2] in markets:
-                       list_of_arb_lists.append(arb_list)
-            print("List of Arbitrage Symbols:", list_of_arb_lists)
-
-            for arb_list in list_of_arb_lists:
-                arbitrageopp = find_tri_arb_opp(exchange1, markets, arb_list)
-                if(arbitrageopp['profit'] > 0.0):
-                    quantity_list = arbitrageopp['quantity_list']
-                    pre_tri_arb_USD_transfer(arbitrageopp['exchange'], arbitrageopp['sym_list'], arbitrageopp['fee_percentage'], quantity_list[0])
-                    quantity_3 = tri_arb_orders(arbitrageopp['exchange'], arbitrageopp['exch_rate_list'], arbitrageopp['sym_list'], arbitrageopp['quantity_list'], arbitrageopp['fee_percentage'])
-                    post_tri_arb_USD_transfer(arbitrageopp['exchange'],  arbitrageopp['sym_list'], arbitrageopp['fee_percentage'], quantity_3)
-                    print("Everything is complete")
+                        print(arb_list)
+                        list_of_arb_lists.append(arb_list)
+                        list_of_arb_listswmarkets.append([arb_list, markets])
+            print("\nList of Arbitrage Symbols:", list_of_arb_lists)
+            list_of_lists_of_arb_lists.append([exchange1, list_of_arb_lists])
+    return list_of_lists_of_arb_lists
 
 
-def find_tri_arb_opp(exchange, total_markets, arb_list, fee_percentage = .001):
+
+async def execute_all_tri_arb_orders(list_of_lists_of_arb_lists):
+    #Determines profitability and executes profitable orders.
+    profit_spread_list = []
+    for list_of_arb_lists in list_of_lists_of_arb_lists:
+        exchange = list_of_arb_lists[0]
+        var = await exchange.load_markets()
+        markets = var.keys()
+        for arb_list in list_of_arb_lists[1]:
+            # print("{} \n".format(exchange1))
+            # print("{} \n".format(markets))
+            # print("{} \n".format(arb_list))
+            # arbitrageopp = asyncio.gather(await find_tri_arb_opp(exchange1, list(markets), arb_list))
+            arbitrageopp = await find_tri_arb_opp(exchange, markets, arb_list)
+            if(arbitrageopp['profit'] > 0.0):
+                profit_spread_list.append(arbitrageopp['profit'])
+                quantity_list = arbitrageopp['quantity_list']
+                # await pre_tri_arb_USD_transfer(arbitrageopp['exchange'], arbitrageopp['sym_list'], arbitrageopp['fee_percentage'], quantity_list[0])
+                # quantity_3 = tri_arb_orders(arbitrageopp['exchange'], arbitrageopp['exch_rate_list'], arbitrageopp['sym_list'], arbitrageopp['quantity_list'], arbitrageopp['fee_percentage'])
+                # await post_tri_arb_USD_transfer(arbitrageopp['exchange'],  arbitrageopp['sym_list'], arbitrageopp['fee_percentage'], quantity_3)
+                print("\nOrdering should be complete by this point\n")
+    return profit_spread_list
+
+
+async def find_tri_arb_opp(exchange, total_markets, arb_list, fee_percentage = .001):
     # Determine Rates for our 3 currency pairs - order book
+    await exchange.load_markets()
     opp_exch_rate_list = []
     opp_quantity_list = []
     opp_max_bid_price_quantity = []
     list_exch_rate_list = []
     exch_rate_list = []
-    for k in range(0, 1):
-        i = 0
-        print("Cycle Number: ", k)
-        for sym in arb_list:
-            print(sym)
-            if sym in exchange.symbols:
-                if i % 2 == 0:
-                    opp_max_bid_price_quantity = maxBid(exchange, sym, total_markets)
-                    # assumed trade volume of $100
-                    if opp_max_bid_price_quantity['isFound']:
-                        exch_rate_list.append(opp_max_bid_price_quantity['bid_price'])
-                        print(opp_max_bid_price_quantity['bid_price'])
-                        opp_quantity_list.append(opp_max_bid_price_quantity['bid_quantity'])
-                        opp_max_bid_price_quantity['bid_quantity']
-                    else:
-                        print("Could not find a bid_price or bid_quantity")
-                        exch_rate_list.append(0)
-
+    
+    i = 0
+    print("\nChecking for profit: ")
+    for sym in arb_list:
+        # print(sym)
+        if sym in exchange.symbols:
+            if i % 2 == 0:
+                opp_max_bid_price_quantity = await maxBid(exchange, sym, total_markets)
+                # assumed trade volume of $100
+                if opp_max_bid_price_quantity['isFound']:
+                    exch_rate_list.append(opp_max_bid_price_quantity['bid_price'])
+                    print("Max Bid Price: {}".format(opp_max_bid_price_quantity['bid_price']))
+                    opp_quantity_list.append(opp_max_bid_price_quantity['bid_quantity'])
+                    # opp_max_bid_price_quantity['bid_quantity']
                 else:
-                    opp_min_ask_price_quantity = minAsk(exchange, sym, total_markets)
-                    # assumed trade volume of $100
-                    if opp_min_ask_price_quantity['isFound']:
-                        exch_rate_list.append(opp_min_ask_price_quantity['ask_price'])
-                        print(opp_min_ask_price_quantity['ask_price'])
-                        opp_quantity_list.append(opp_min_ask_price_quantity['ask_quantity'])
-                        print(opp_min_ask_price_quantity['ask_price'])
-                    else:
-                        print("Could not find a ask_price or ask_quantity")
-                        exch_rate_list.append(0)
-                i += 1
+                    print("\nCould not find a bid_price or bid_quantity\n")
+                    exch_rate_list.append(0)
+
             else:
-                exch_rate_list.append(0)
-            # exch_rate_list.append(((rateB[-1]-rateA[-1])/rateA[-1])*100)  #Expected Profit
-            print(exch_rate_list)
-            # Compare to determine if Arbitrage opp exists
-            try:
-                if exch_rate_list[0] < exch_rate_list[1]/exch_rate_list[2]:
-                    # calculate real rate!!!
-                    exchangeratespread = (exch_rate_list[1]/exch_rate_list[2]) - exch_rate_list[0]
-                    opp_exch_rate_list = exch_rate_list
-                    print("Arbitrage Possibility")
+                opp_min_ask_price_quantity = await minAsk(exchange, sym, total_markets)
+                # assumed trade volume of $100
+                if opp_min_ask_price_quantity['isFound']:
+                    exch_rate_list.append(opp_min_ask_price_quantity['ask_price'])
+                    print("Min Ask Price: {}".format(opp_min_ask_price_quantity['ask_price']))
+                    opp_quantity_list.append(opp_min_ask_price_quantity['ask_quantity'])
+                    # print(opp_min_ask_price_quantity['ask_price'])
                 else:
-                    print("No Arbitrage Possibility")
-            except:
-                print("No Arbitrage Possibility")
-            # Format data (list) into List format (list of lists)
-            # list_exch_rate_list.append(exch_rate_list)
+                    print("\nCould not find a ask_price or ask_quantity\n")
+                    exch_rate_list.append(0)
+            i += 1
+        else:
+            exch_rate_list.append(0)
+        # exch_rate_list.append(((rateB[-1]-rateA[-1])/rateA[-1])*100)  #Expected Profit
+        # print("Exchange Rate List: {}".format(exch_rate_list))
+        # Compare to determine if Arbitrage opp exists
+    try:
+        if exch_rate_list[0] < exch_rate_list[1]/exch_rate_list[2]:
+            # calculate real rate!!!
+            exchangeratespread = (exch_rate_list[1]/exch_rate_list[2]) - exch_rate_list[0]
+            opp_exch_rate_list = exch_rate_list
+            print("Arbitrage Possibility")
+        else:
+            print("No Arbitrage Possibility")
+    except:
+        print("No Arbitrage Possibility")
+        # Format data (list) into List format (list of lists)
+        # list_exch_rate_list.append(exch_rate_list)
 
-        rateA = 0.0  # Original Exchange Rate
-        rateB = 0.0  # Calculated/Arbitrage Exchange Rate
-        rateB_fee = 0.0  # Include Transaction Fee
-        price1 = 0.0  # List for Price of Token (Trade) 1
-        price2 = 0.0  # List for price of Token (Trade) 2
-        time_list = 0.0  # time of data collection
-        profit = 0.0  # Record % profit
-        try:
-            rateA = (exch_rate_list[0])
-            rateB = (exch_rate_list[1]/exch_rate_list[2])
-            rateB_fee = ((exch_rate_list[1]/exch_rate_list[2])*(1-fee_percentage)*(1-fee_percentage))
-            price1 = (exch_rate_list[1])
-            price2 = (exch_rate_list[2])
-            profit = (rateB-rateA)/rateA - (fee_percentage * 5)
-            print("Original Exchange Rate: {} \nArbitrage Exchange Rate: {} \nArbitrage Exchange Rate including Fees: {} \nReal Profit: {}".format(rateA, rateB, rateB_fee, profit))
-        except:
-            print("Could not print out rates")
+    rateA = 0.0  # Original Exchange Rate
+    rateB = 0.0  # Calculated/Arbitrage Exchange Rate
+    rateB_fee = 0.0  # Include Transaction Fee
+    price1 = 0.0  # List for Price of Token (Trade) 1
+    price2 = 0.0  # List for price of Token (Trade) 2
+    time_list = 0.0  # time of data collection
+    profit = 0.0  # Record % profit
+    try:
+        rateA = (exch_rate_list[0])
+        rateB = (exch_rate_list[1]/exch_rate_list[2])
+        rateB_fee = ((exch_rate_list[1]/exch_rate_list[2])*(1-fee_percentage)*(1-fee_percentage))
+        price1 = (exch_rate_list[1])
+        price2 = (exch_rate_list[2])
+        profit = (rateB-rateA) - (fee_percentage * 5)
+        # if profit > 0:
+        #     print("Original Exchange Rate: {} \nArbitrage Exchange Rate: {} \nArbitrage Exchange Rate including Fees: {} \nReal Profit: {}".format(rateA, rateB, rateB_fee, profit))
+    except:
+        print("One of the rates is 0. Which means minAsk or maxBid returned 0 for ask_price or bid_price respectively. Which prolly means no asks or bids > 100$.")
+    if profit > 0 and rateA != 0:
+        print("FOUND PROFITABLE ARBITRAGE \n")
+        print("--------------------------- \n")
+        total_fee_pct = fee_percentage * 5
+        print("Exchange: {}, Arbitrage: {}, Original Exchange Rate: {}, Arbitrage Exchange Rate: {}, Fee Rate: {}".format(exchange.id, arb_list, rateA, rateB, total_fee_pct))
+        print("REAL PROFIT: {} \n".format(profit))
+        #profit_spread_list.append(profit)
+        #profit_volume_list.append()
 
     #exchange.close()
     arbitrage = {
@@ -196,34 +231,38 @@ def find_tri_arb_opp(exchange, total_markets, arb_list, fee_percentage = .001):
     }
     return arbitrage
 
-def maxBid(exchange, market, total_markets, min_USD_for_trade=100):
+async def maxBid(exchange, market, total_markets, min_USD_for_trade=100):
+    await exchange.load_markets()
     price_quantity = {}
     finalmarket = ''
     USDmarket = market[0:3] + "/USD"
     USDCmarket = market[0:3] + "/USDC"
     USDTmarket = market[0:3] + "/USDT"
-    if USDmarket in total_markets:
-        finalmarket = USDmarket
-        USDdepth = exchange.fetch_order_book(symbol=finalmarket)
-        min_quantity = round(float(min_USD_for_trade/(USDdepth['bids'][0][0])), amount_digits_rounded)
-    elif USDCmarket in total_markets:
-        finalmarket = USDCmarket
-        USDdepth = exchange.fetch_order_book(symbol=finalmarket)
-        min_quantity = round(float(min_USD_for_trade/(USDdepth['bids'][0][0])), amount_digits_rounded)
-    elif USDTmarket in total_markets:
-        finalmarket = USDTmarket
-        USDdepth = exchange.fetch_order_book(symbol=finalmarket)
-        min_quantity = round(float(min_USD_for_trade/(USDdepth['bids'][0][0])), amount_digits_rounded)
-    else:
-        price_quantity = {
-            'bid_price': 0,
-            'bid_quantity': 0,
-            'isFound': False
-        }
-        print("Cannot find compatible USD/USDC/USDT market")
-        return price_quantity
     try:
-        depth = exchange.fetch_order_book(symbol=market)
+        if USDmarket in total_markets:
+            finalmarket = USDmarket
+            USDdepth = await exchange.fetch_order_book(symbol=finalmarket)
+            min_quantity = round(float(min_USD_for_trade/(USDdepth['bids'][0][0])), amount_digits_rounded)
+        elif USDCmarket in total_markets:
+            finalmarket = USDCmarket
+            USDdepth = await exchange.fetch_order_book(symbol=finalmarket)
+            min_quantity = round(float(min_USD_for_trade/(USDdepth['bids'][0][0])), amount_digits_rounded)
+        elif USDTmarket in total_markets:
+            finalmarket = USDTmarket
+            USDdepth = await exchange.fetch_order_book(symbol=finalmarket)
+            min_quantity = round(float(min_USD_for_trade/(USDdepth['bids'][0][0])), amount_digits_rounded)
+        else:
+            price_quantity = {
+                'bid_price': 0,
+                'bid_quantity': 0,
+                'isFound': False
+            }
+            print("Cannot find compatible USD/USDC/USDT market")
+            return price_quantity
+    except:
+        print('has no bids for USDC/USDT/USD')
+    try:
+        depth = await exchange.fetch_order_book(symbol=market)
         for bid in depth['bids']:
             if bid[1] > min_quantity:
                 rounded_bid_price = round(float(bid[0]),amount_digits_rounded)
@@ -250,35 +289,39 @@ def maxBid(exchange, market, total_markets, min_USD_for_trade=100):
         print("Error with Max Bid")
         return price_quantity
 
-def minAsk(exchange, market, total_markets, min_USD_for_trade = 100):
+async def minAsk(exchange, market, total_markets, min_USD_for_trade = 100):
+    await exchange.load_markets()
     price_quantity = {}
     price_quantity = {}
     finalmarket = ''
     USDmarket = market[0:3] + "/USD"
     USDCmarket = market[0:3] + "/USDC"
     USDTmarket = market[0:3] + "/USDT"
-    if USDmarket in total_markets:
-        finalmarket = USDmarket
-        USDdepth = exchange.fetch_order_book(symbol=finalmarket)
-        min_quantity = round(float(min_USD_for_trade/(USDdepth['asks'][0][0])), amount_digits_rounded)
-    elif USDCmarket in total_markets:
-        finalmarket = USDCmarket
-        USDdepth = exchange.fetch_order_book(symbol=finalmarket)
-        min_quantity = round(float(min_USD_for_trade/(USDdepth['asks'][0][0])), amount_digits_rounded)
-    elif USDTmarket in total_markets:
-        finalmarket = USDTmarket
-        USDdepth = exchange.fetch_order_book(symbol=finalmarket)
-        min_quantity = round(float(min_USD_for_trade/(USDdepth['asks'][0][0])), amount_digits_rounded)
-    else:
-        price_quantity = {
-            'ask_price': 0,
-            'ask_quantity': 0,
-            'isFound': False
-        }
-        print("Cannot find compatible USD/USDC/USDT market")
-        return price_quantity
+    try: 
+        if USDmarket in total_markets:
+            finalmarket = USDmarket
+            USDdepth = await exchange.fetch_order_book(symbol=finalmarket)
+            min_quantity = round(float(min_USD_for_trade/(USDdepth['asks'][0][0])), amount_digits_rounded)
+        elif USDCmarket in total_markets:
+            finalmarket = USDCmarket
+            USDdepth = await exchange.fetch_order_book(symbol=finalmarket)
+            min_quantity = round(float(min_USD_for_trade/(USDdepth['asks'][0][0])), amount_digits_rounded)
+        elif USDTmarket in total_markets:
+            finalmarket = USDTmarket
+            USDdepth = await exchange.fetch_order_book(symbol=finalmarket)
+            min_quantity = round(float(min_USD_for_trade/(USDdepth['asks'][0][0])), amount_digits_rounded)
+        else:
+            price_quantity = {
+                'ask_price': 0,
+                'ask_quantity': 0,
+                'isFound': False
+            }
+            print("Cannot find compatible USD/USDC/USDT market")
+            return price_quantity
+    except:
+        print('has no asks for USDC/USDT/USD')
     try:
-        depth = exchange.fetch_order_book(symbol = market)
+        depth = await exchange.fetch_order_book(symbol = market)
         for ask in depth['asks']:
             if ask[1] > min_quantity:
                 rounded_ask_price = round(float(ask[0]),amount_digits_rounded)
@@ -304,13 +347,13 @@ def minAsk(exchange, market, total_markets, min_USD_for_trade = 100):
         print("Error with minAsk")
         return price_quantity
 
-def pre_tri_arb_USD_transfer(exchange, sym_list, fee_percentage, initial_quantity): #make exchange, exch_rate_list, sym_list, fee_percentage global vars
+async def pre_tri_arb_USD_transfer(exchange, sym_list, fee_percentage, initial_quantity): #make exchange, exch_rate_list, sym_list, fee_percentage global vars
     market1 = sym_list[0]
     USDmarket = market1[0:3] + "/USDC"
     print("Transferring capital in USDC to " + market1)
     try:
-        depth = exchange.fetch_order_book(symbol = USDmarket)
-        USD_sell_exch_rate = round(maxBid(exchange, market1) ['bid_price']) #is this the highest volume in the bid order book... should it be a limit or market order?
+        depth = await exchange.fetch_order_book(symbol = USDmarket)
+        USD_sell_exch_rate = round(await maxBid(exchange, market1) ['bid_price']) #is this the highest volume in the bid order book... should it be a limit or market order?
         non_fee_adjusted_quantity = initial_quantity/USD_sell_exch_rate
         totalprice = non_fee_adjusted_quantity * USD_sell_exch_rate
         fee_adjusted_quantity = (totalprice + (totalprice * fee_percentage)) / USD_sell_exch_rate
@@ -381,12 +424,12 @@ def tri_arb_orders(exchange, exch_rate_list, sym_list, quantity_list, fee_percen
         print("Could not complete order.")
     return fee_adjusted_quantity_3
 
-def post_tri_arb_USD_transfer(exchange,  sym_list, fee_percentage, quantity_3):
+async def post_tri_arb_USD_transfer(exchange,  sym_list, fee_percentage, quantity_3):
     market1 = sym_list[0]
     USDmarket = market1[0:3] + "/USDC"
     print("Transfering capital in " + USDmarket + " to USDC")
-    depth = exchange.fetch_order_book(symbol = USDmarket)
-    USD_buy_exch_rate = round(minAsk(exchange, market1) ['ask_price'])
+    depth = await exchange.fetch_order_book(symbol = USDmarket)
+    USD_buy_exch_rate = round(await minAsk(exchange, market1) ['ask_price'])
     non_fee_adjusted_quantity = quantity_3 / USD_buy_exch_rate
     totalprice = non_fee_adjusted_quantity * USD_buy_exch_rate
     fee_adjusted_quantity = (totalprice - (totalprice * fee_percentage)) / USD_sell_exch_rate
@@ -399,6 +442,20 @@ def post_tri_arb_USD_transfer(exchange,  sym_list, fee_percentage, quantity_3):
                         timeInForce=TIME_IN_FORCE_GTC)
     else:
         print("Could not complete order.")
+
+
+async def compute_avg_spread(profit_spread_list):
+    sum_spread = 0
+    num = 0
+    for spread in profit_spread_list:
+        sum_spread += spread
+        num += 1
+    print("AVERAGE SPREAD: {}".format(sum_spread/num))
+    print("AVERAGE PROFIT VOLUME (assuming all trades have the minimum volume of $100): {}".format((sum_spread/num)*100))
+    return sum_spread/num
+
+
+
 asyncio.get_event_loop().run_until_complete(run())
 
 if __name__ == "__main__":
