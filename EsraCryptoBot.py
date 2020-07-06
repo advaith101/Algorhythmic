@@ -19,8 +19,19 @@ async def run():
     while 1:
         profit_spread_list = await execute_all_tri_arb_orders(list_of_lists_of_arb_lists)
         await compute_avg_spread(profit_spread_list)
-        print("CYCLE FINISHED, STARTING NEXT CYCLE...")
-        await asyncio.sleep(3)
+        print("\n\n---------------CYCLE FINISHED---------------\n\n")
+        #For now we can choose to continue with next cycle
+        x = input("Do you want to start next cycle? (y/n)")
+        while x != 'n':
+            if x == 'y':
+                break
+            x = input("Invalid Input: Do you want to start next cycle? (y/n)")
+        if x == 'n':
+            break
+        continue
+        # print("CYCLE FINISHED, STARTING NEXT CYCLE...")
+        # await asyncio.sleep(3)
+    print("\n\nEsra CryptoBot has finished running\n\n")
 
 async def config_arbitrages():
     print("\n\n ----------------------------------- \n\n")
@@ -37,14 +48,17 @@ async def config_arbitrages():
             markets = val.keys()
         except:
             print('\nExchange is not loading markets.. Moving on\n')
+            continue
         print("Exchange Name: {}".format(exchange1.id))
         symbols = exchange1.symbols
         # print(symbols)
         if symbols is None:
             print("Skipping Exchange ", exch)
             print("\n-----------------\nNext Exchange\n-----------------")
+            continue
         elif len(symbols) < 30:
             print("\n-----------------\nNeed more Pairs (Next Exchange)\n-----------------")
+            continue
         else:
             print(exchange1)
             exchange1_info = dir(exchange1)
@@ -107,9 +121,9 @@ async def config_arbitrages():
                     if arb_list[0] in markets and arb_list[1] in markets and arb_list[2] in markets:
                         print(arb_list)
                         list_of_arb_lists.append(arb_list)
-                        list_of_arb_listswmarkets.append([arb_list, markets])
+
             print("\nList of Arbitrage Symbols:", list_of_arb_lists)
-            list_of_lists_of_arb_lists.append([exchange1, list_of_arb_lists])
+            list_of_lists_of_arb_lists.append([exchange1, list_of_arb_lists, markets])
     return list_of_lists_of_arb_lists
 
 
@@ -119,21 +133,23 @@ async def execute_all_tri_arb_orders(list_of_lists_of_arb_lists):
     profit_spread_list = []
     for list_of_arb_lists in list_of_lists_of_arb_lists:
         exchange = list_of_arb_lists[0]
-        var = await exchange.load_markets()
-        markets = var.keys()
+        markets = list_of_arb_lists[2]
         for arb_list in list_of_arb_lists[1]:
             # print("{} \n".format(exchange1))
             # print("{} \n".format(markets))
             # print("{} \n".format(arb_list))
             # arbitrageopp = asyncio.gather(await find_tri_arb_opp(exchange1, list(markets), arb_list))
             arbitrageopp = await find_tri_arb_opp(exchange, markets, arb_list)
-            if(arbitrageopp['profit'] > 0.0):
-                profit_spread_list.append(arbitrageopp['profit'])
-                quantity_list = arbitrageopp['quantity_list']
-                # await pre_tri_arb_USD_transfer(arbitrageopp['exchange'], arbitrageopp['sym_list'], arbitrageopp['fee_percentage'], quantity_list[0])
-                # quantity_3 = tri_arb_orders(arbitrageopp['exchange'], arbitrageopp['exch_rate_list'], arbitrageopp['sym_list'], arbitrageopp['quantity_list'], arbitrageopp['fee_percentage'])
-                # await post_tri_arb_USD_transfer(arbitrageopp['exchange'],  arbitrageopp['sym_list'], arbitrageopp['fee_percentage'], quantity_3)
-                print("\nOrdering should be complete by this point\n")
+            try:
+                if(arbitrageopp['profit'] > 0.0):
+                    profit_spread_list.append(arbitrageopp['profit'])
+                    quantity_list = arbitrageopp['quantity_list']
+                    # await pre_tri_arb_USD_transfer(arbitrageopp['exchange'], arbitrageopp['sym_list'], arbitrageopp['fee_percentage'], quantity_list[0])
+                    # quantity_3 = tri_arb_orders(arbitrageopp['exchange'], arbitrageopp['exch_rate_list'], arbitrageopp['sym_list'], arbitrageopp['quantity_list'], arbitrageopp['fee_percentage'])
+                    # await post_tri_arb_USD_transfer(arbitrageopp['exchange'],  arbitrageopp['sym_list'], arbitrageopp['fee_percentage'], quantity_3)
+                    print("\nOrdering should be complete by this point\n")
+            except:
+                print("\n\nNo Arbitrage Possibility\n\n")
     return profit_spread_list
 
 
@@ -161,8 +177,8 @@ async def find_tri_arb_opp(exchange, total_markets, arb_list, fee_percentage = .
                     # opp_max_bid_price_quantity['bid_quantity']
                 else:
                     print("\nCould not find a bid_price or bid_quantity\n")
+                    break
                     exch_rate_list.append(0)
-
             else:
                 opp_min_ask_price_quantity = await minAsk(exchange, sym, total_markets)
                 # assumed trade volume of $100
@@ -173,6 +189,7 @@ async def find_tri_arb_opp(exchange, total_markets, arb_list, fee_percentage = .
                     # print(opp_min_ask_price_quantity['ask_price'])
                 else:
                     print("\nCould not find a ask_price or ask_quantity\n")
+                    break
                     exch_rate_list.append(0)
             i += 1
         else:
@@ -181,17 +198,21 @@ async def find_tri_arb_opp(exchange, total_markets, arb_list, fee_percentage = .
         # print("Exchange Rate List: {}".format(exch_rate_list))
         # Compare to determine if Arbitrage opp exists
     try:
-        if exch_rate_list[0] < exch_rate_list[1]/exch_rate_list[2]:
-            # calculate real rate!!!
-            exchangeratespread = (exch_rate_list[1]/exch_rate_list[2]) - exch_rate_list[0]
-            opp_exch_rate_list = exch_rate_list
-            print("Arbitrage Possibility")
-        else:
-            print("No Arbitrage Possibility")
+        if exch_rate_list[0] != 0 and exch_rate_list[1] != 0 and exch_rate_list[2] != 0: 
+            if exch_rate_list[0] < exch_rate_list[1]/exch_rate_list[2]:
+                # calculate real rate!!!
+                exchangeratespread = (exch_rate_list[1]/exch_rate_list[2]) - exch_rate_list[0]
+                opp_exch_rate_list = exch_rate_list
+                print("Arbitrage Possibility")
+            else:
+                # print("No Arbitrage Possibility")
+                return None
+        else: 
+            print("One of the exchange rates is 0. No Arbitrage Possibility")
+            return None
     except:
-        print("No Arbitrage Possibility")
-        # Format data (list) into List format (list of lists)
-        # list_exch_rate_list.append(exch_rate_list)
+        # print("No Arbitrage Possibility")
+        return None
 
     rateA = 0.0  # Original Exchange Rate
     rateB = 0.0  # Calculated/Arbitrage Exchange Rate
@@ -207,11 +228,9 @@ async def find_tri_arb_opp(exchange, total_markets, arb_list, fee_percentage = .
         price1 = (exch_rate_list[1])
         price2 = (exch_rate_list[2])
         profit = (rateB-rateA) - (fee_percentage * 5)
-        # if profit > 0:
-        #     print("Original Exchange Rate: {} \nArbitrage Exchange Rate: {} \nArbitrage Exchange Rate including Fees: {} \nReal Profit: {}".format(rateA, rateB, rateB_fee, profit))
     except:
         print("One of the rates is 0. Which means minAsk or maxBid returned 0 for ask_price or bid_price respectively. Which prolly means no asks or bids > 100$.")
-    if profit > 0 and rateA != 0:
+    if profit > 0 and rateA != 0 and rateB != 0:
         print("FOUND PROFITABLE ARBITRAGE \n")
         print("--------------------------- \n")
         total_fee_pct = fee_percentage * 5
@@ -231,7 +250,7 @@ async def find_tri_arb_opp(exchange, total_markets, arb_list, fee_percentage = .
     }
     return arbitrage
 
-async def maxBid(exchange, market, total_markets, min_USD_for_trade=100):
+async def maxBid(exchange, market, total_markets, min_USD_for_trade=1000):
     await exchange.load_markets()
     price_quantity = {}
     finalmarket = ''
@@ -289,7 +308,7 @@ async def maxBid(exchange, market, total_markets, min_USD_for_trade=100):
         print("Error with Max Bid")
         return price_quantity
 
-async def minAsk(exchange, market, total_markets, min_USD_for_trade = 100):
+async def minAsk(exchange, market, total_markets, min_USD_for_trade = 1000):
     await exchange.load_markets()
     price_quantity = {}
     price_quantity = {}
@@ -451,7 +470,9 @@ async def compute_avg_spread(profit_spread_list):
         sum_spread += spread
         num += 1
     print("AVERAGE SPREAD: {}".format(sum_spread/num))
-    print("AVERAGE PROFIT VOLUME (assuming all trades have the minimum volume of $100): {}".format((sum_spread/num)*100))
+    print("AVERAGE PROFIT VOLUME (assuming all trades have the volume of $1000): {}".format((sum_spread/num)*1000))
+    print("NUMBER OF TRADES: {}".format(num))
+    print("TOTAL PROFIT VOLUME (from this cycle): {}".format(sum_spread*1000))
     return sum_spread/num
 
 
