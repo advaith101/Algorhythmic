@@ -241,13 +241,11 @@ async def find_tri_arb_opp(exchange, total_markets, arb_list, fee_percentage = .
         print("Exchange: {}, Arbitrage: {}, Original Exchange Rate: {}, Arbitrage Exchange Rate: {}, Fee Rate: {}".format(exchange.id, arb_list, rateA, rateB, total_fee_pct))
         print("REAL PROFIT: {} \n".format(profit))
         var = await exchange.fetch_order_book(symbol=arb_list[0])
-        await asyncio.sleep(2)
         var1 = await exchange.fetch_order_book(symbol=arb_list[1])
-        await asyncio.sleep(2)
         var2 = await exchange.fetch_order_book(symbol=arb_list[2])
-        print("HIGHEST BID PRICES (1): {} \n\n".format(var['bids']))
-        print("HIGHEST ASK PRICES (2): {} \n\n".format(var1['asks']))
-        print("HIGHEST BID PRICES (3): {}".format(var2['bids']))
+        # print("HIGHEST BID PRICES (1): {} \n\n".format(var['bids']))
+        # print("HIGHEST ASK PRICES (2): {} \n\n".format(var1['asks']))
+        # print("HIGHEST BID PRICES (3): {}".format(var2['bids']))
 
 
         #profit_spread_list.append(profit)
@@ -265,120 +263,148 @@ async def find_tri_arb_opp(exchange, total_markets, arb_list, fee_percentage = .
     return arbitrage
 
 async def maxBid(exchange, market, total_markets, min_USD_for_trade=1000):
-    await exchange.load_markets()
-    price_quantity = {}
-    finalmarket = ''
-    USDmarket = market[0:3] + "/USD"
-    USDCmarket = market[0:3] + "/USDC"
-    USDTmarket = market[0:3] + "/USDT"
     try:
-        if USDmarket in total_markets:
-            finalmarket = USDmarket
-            USDdepth = await exchange.fetch_order_book(symbol=finalmarket)
-            min_quantity = round(float(min_USD_for_trade/(USDdepth['bids'][0][0])), amount_digits_rounded)
-        elif USDCmarket in total_markets:
-            finalmarket = USDCmarket
-            USDdepth = await exchange.fetch_order_book(symbol=finalmarket)
-            min_quantity = round(float(min_USD_for_trade/(USDdepth['bids'][0][0])), amount_digits_rounded)
-        elif USDTmarket in total_markets:
-            finalmarket = USDTmarket
-            USDdepth = await exchange.fetch_order_book(symbol=finalmarket)
-            min_quantity = round(float(min_USD_for_trade/(USDdepth['bids'][0][0])), amount_digits_rounded)
-        else:
-            price_quantity = {
-                'bid_price': 0,
-                'bid_quantity': 0,
-                'isFound': False
-            }
-            print("Cannot find compatible USD/USDC/USDT market")
-            return price_quantity
-    except:
-        print('has no bids for USDC/USDT/USD')
-    try:
+        await exchange.load_markets()
         depth = await exchange.fetch_order_book(symbol=market)
-        for bid in depth['bids']:
-            if bid[1] > min_quantity:
-                rounded_bid_price = round(float(bid[0]),amount_digits_rounded)
-                rounded_bid_quantity = round(float(bid[1]),amount_digits_rounded)
-                price_quantity = {
-                    'bid_price': rounded_bid_price,
-                    'bid_quantity': rounded_bid_quantity,
-                    'isFound': True
-                }
-                return price_quantity
         price_quantity = {
-            'bid_price': rounded_bid_price,
-            'bid_quantity': rounded_bid_quantity,
-            'isFound': False
+            'bid_price': depth['bids'][0][0],
+            'bid_quantity': depth['bids'][1][0],
+            'isFound': True
         }
-        print("Could not find a bid above minimum quantity")
-        return price_quantity
     except:
         price_quantity = {
             'bid_price': 0,
             'bid_quantity': 0,
             'isFound': False
         }
-        print("Error with Max Bid")
-        return price_quantity
+    # price_quantity = {}
+    # finalmarket = ''
+    # USDmarket = market[0:3] + "/USD"
+    # USDCmarket = market[0:3] + "/USDC"
+    # USDTmarket = market[0:3] + "/USDT"
+    # try:
+    #     if USDmarket in total_markets:
+    #         finalmarket = USDmarket
+    #         USDdepth = await exchange.fetch_order_book(symbol=finalmarket)
+    #         min_quantity = round(float(min_USD_for_trade/(USDdepth['bids'][0][0])), amount_digits_rounded)
+    #     elif USDCmarket in total_markets:
+    #         finalmarket = USDCmarket
+    #         USDdepth = await exchange.fetch_order_book(symbol=finalmarket)
+    #         min_quantity = round(float(min_USD_for_trade/(USDdepth['bids'][0][0])), amount_digits_rounded)
+    #     elif USDTmarket in total_markets:
+    #         finalmarket = USDTmarket
+    #         USDdepth = await exchange.fetch_order_book(symbol=finalmarket)
+    #         min_quantity = round(float(min_USD_for_trade/(USDdepth['bids'][0][0])), amount_digits_rounded)
+    #     else:
+    #         price_quantity = {
+    #             'bid_price': 0,
+    #             'bid_quantity': 0,
+    #             'isFound': False
+    #         }
+    #         print("Cannot find compatible USD/USDC/USDT market")
+    #         return price_quantity
+    # except:
+    #     print('has no bids for USDC/USDT/USD')
+    # try:
+    #     depth = await exchange.fetch_order_book(symbol=market)
+    #     for bid in depth['bids']:
+    #         if bid[1] > min_quantity:
+    #             rounded_bid_price = round(float(bid[0]),amount_digits_rounded)
+    #             rounded_bid_quantity = round(float(bid[1]),amount_digits_rounded)
+    #             price_quantity = {
+    #                 'bid_price': rounded_bid_price,
+    #                 'bid_quantity': rounded_bid_quantity,
+    #                 'isFound': True
+    #             }
+    #             return price_quantity
+    #     price_quantity = {
+    #         'bid_price': rounded_bid_price,
+    #         'bid_quantity': rounded_bid_quantity,
+    #         'isFound': False
+    #     }
+    #     print("Could not find a bid above minimum quantity")
+    #     return price_quantity
+    # except:
+    #     price_quantity = {
+    #         'bid_price': 0,
+    #         'bid_quantity': 0,
+    #         'isFound': False
+    #     }
+    #     print("Error with Max Bid")
+        # return price_quantity
+    return price_quantity
 
 async def minAsk(exchange, market, total_markets, min_USD_for_trade = 1000):
-    await exchange.load_markets()
-    price_quantity = {}
-    price_quantity = {}
-    finalmarket = ''
-    USDmarket = market[0:3] + "/USD"
-    USDCmarket = market[0:3] + "/USDC"
-    USDTmarket = market[0:3] + "/USDT"
-    try: 
-        if USDmarket in total_markets:
-            finalmarket = USDmarket
-            USDdepth = await exchange.fetch_order_book(symbol=finalmarket)
-            min_quantity = round(float(min_USD_for_trade/(USDdepth['asks'][0][0])), amount_digits_rounded)
-        elif USDCmarket in total_markets:
-            finalmarket = USDCmarket
-            USDdepth = await exchange.fetch_order_book(symbol=finalmarket)
-            min_quantity = round(float(min_USD_for_trade/(USDdepth['asks'][0][0])), amount_digits_rounded)
-        elif USDTmarket in total_markets:
-            finalmarket = USDTmarket
-            USDdepth = await exchange.fetch_order_book(symbol=finalmarket)
-            min_quantity = round(float(min_USD_for_trade/(USDdepth['asks'][0][0])), amount_digits_rounded)
-        else:
-            price_quantity = {
-                'ask_price': 0,
-                'ask_quantity': 0,
-                'isFound': False
-            }
-            print("Cannot find compatible USD/USDC/USDT market")
-            return price_quantity
-    except:
-        print('has no asks for USDC/USDT/USD')
     try:
-        depth = await exchange.fetch_order_book(symbol = market)
-        for ask in depth['asks']:
-            if ask[1] > min_quantity:
-                rounded_ask_price = round(float(ask[0]),amount_digits_rounded)
-                rounded_ask_quantity = round(float(ask[1]),amount_digits_rounded)
-                price_quantity = {
-                    'ask_price': rounded_ask_price,
-                    'ask_quantity': rounded_ask_quantity,
-                    'isFound': True
-                }
-                return price_quantity
+        await exchange.load_markets()
+        depth = await exchange.fetch_order_book(symbol=market)
         price_quantity = {
-            'ask_price': rounded_ask_price,
-            'ask_quantity': rounded_ask_quantity,
-            'isFound': False
+            'ask_price': depth['asks'][0][0],
+            'ask_quantity': depth['asks'][1][0],
+            'isFound': True
         }
-        return price_quantity
     except:
         price_quantity = {
             'ask_price': 0,
             'ask_quantity': 0,
             'isFound': False
         }
-        print("Error with minAsk")
-        return price_quantity
+    # price_quantity = {}
+    # price_quantity = {}
+    # finalmarket = ''
+    # USDmarket = market[0:3] + "/USD"
+    # USDCmarket = market[0:3] + "/USDC"
+    # USDTmarket = market[0:3] + "/USDT"
+    # try: 
+    #     if USDmarket in total_markets:
+    #         finalmarket = USDmarket
+    #         USDdepth = await exchange.fetch_order_book(symbol=finalmarket)
+    #         min_quantity = round(float(min_USD_for_trade/(USDdepth['asks'][0][0])), amount_digits_rounded)
+    #     elif USDCmarket in total_markets:
+    #         finalmarket = USDCmarket
+    #         USDdepth = await exchange.fetch_order_book(symbol=finalmarket)
+    #         min_quantity = round(float(min_USD_for_trade/(USDdepth['asks'][0][0])), amount_digits_rounded)
+    #     elif USDTmarket in total_markets:
+    #         finalmarket = USDTmarket
+    #         USDdepth = await exchange.fetch_order_book(symbol=finalmarket)
+    #         min_quantity = round(float(min_USD_for_trade/(USDdepth['asks'][0][0])), amount_digits_rounded)
+    #     else:
+    #         price_quantity = {
+    #             'ask_price': 0,
+    #             'ask_quantity': 0,
+    #             'isFound': False
+    #         }
+    #         print("Cannot find compatible USD/USDC/USDT market")
+    #         return price_quantity
+    # except:
+    #     print('has no asks for USDC/USDT/USD')
+    # try:
+    #     depth = await exchange.fetch_order_book(symbol = market)
+    #     for ask in depth['asks']:
+    #         if ask[1] > min_quantity:
+    #             rounded_ask_price = round(float(ask[0]),amount_digits_rounded)
+    #             rounded_ask_quantity = round(float(ask[1]),amount_digits_rounded)
+    #             price_quantity = {
+    #                 'ask_price': rounded_ask_price,
+    #                 'ask_quantity': rounded_ask_quantity,
+    #                 'isFound': True
+    #             }
+    #             return price_quantity
+    #     price_quantity = {
+    #         'ask_price': rounded_ask_price,
+    #         'ask_quantity': rounded_ask_quantity,
+    #         'isFound': False
+    #     }
+    #     return price_quantity
+    # except:
+    #     price_quantity = {
+    #         'ask_price': 0,
+    #         'ask_quantity': 0,
+    #         'isFound': False
+    #     }
+    #     print("Error with minAsk")
+    #     return price_quantity
+    return price_quantity
 
 async def pre_tri_arb_USD_transfer(exchange, sym_list, fee_percentage, initial_quantity): #make exchange, exch_rate_list, sym_list, fee_percentage global vars
     market1 = sym_list[0]
