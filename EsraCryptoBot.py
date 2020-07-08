@@ -14,7 +14,7 @@ async def run():
     # await exchange.load_markets()
     # test = exchange.symbols
     # print(test)
-    
+
     list_of_lists_of_arb_lists = await config_arbitrages()
     while 1:
         profit_spread_list = await execute_all_tri_arb_orders(list_of_lists_of_arb_lists)
@@ -50,7 +50,7 @@ async def config_arbitrages():
             print('\nExchange is not loading markets.. Moving on\n')
             continue
         print("Exchange Name: {}".format(exchange1.id))
-        filtered_exchanges = ['binance', 'bequant', 'binanceje', 'binanceus', 'bitfinex', 'bitmex', 'bitstamp', 'bittrex', 'bitvavo', 'coinbaseprime', 'coinbasepro', 'ftx', 'gateio', 'hitbtc', 'huobijp', 
+        filtered_exchanges = ['binance', 'bequant', 'binanceje', 'binanceus', 'bitfinex', 'bitmex', 'bitstamp', 'bittrex', 'bitvavo', 'coinbaseprime', 'coinbasepro', 'ftx', 'gateio', 'hitbtc', 'huobijp',
                                 'huobipro', 'huobiru', 'kraken', 'kucoin', 'okcoin', 'okex', 'phemex', 'poloniex', 'upbit']
         if exchange1.id not in filtered_exchanges:
             continue
@@ -165,7 +165,7 @@ async def find_tri_arb_opp(exchange, total_markets, arb_list, fee_percentage = .
     opp_max_bid_price_quantity = []
     list_exch_rate_list = []
     exch_rate_list = []
-    
+
     i = 0
     print("\nChecking for profit: ")
     for sym in arb_list:
@@ -202,7 +202,7 @@ async def find_tri_arb_opp(exchange, total_markets, arb_list, fee_percentage = .
         # print("Exchange Rate List: {}".format(exch_rate_list))
         # Compare to determine if Arbitrage opp exists
     try:
-        if exch_rate_list[0] != 0 and exch_rate_list[1] != 0 and exch_rate_list[2] != 0: 
+        if exch_rate_list[0] != 0 and exch_rate_list[1] != 0 and exch_rate_list[2] != 0:
             if exch_rate_list[0] < exch_rate_list[1]/exch_rate_list[2]:
                 # calculate real rate!!!
                 exchangeratespread = (exch_rate_list[1]/exch_rate_list[2]) - exch_rate_list[0]
@@ -211,7 +211,7 @@ async def find_tri_arb_opp(exchange, total_markets, arb_list, fee_percentage = .
             else:
                 # print("No Arbitrage Possibility")
                 return None
-        else: 
+        else:
             print("One of the exchange rates is 0. No Arbitrage Possibility")
             return None
     except:
@@ -300,10 +300,15 @@ async def maxBid(exchange, market, total_markets, min_USD_for_trade=1000):
             if bid[1] > min_quantity:
                 rounded_bid_price = round(float(bid[0]),amount_digits_rounded)
                 rounded_bid_quantity = round(float(bid[1]),amount_digits_rounded)
+                isCorrect = False
+                ticker = exchange.fetch_ticker(symbol=market)
+                average = (ticker['high'] + ticker['low']) / 2
+                if (abs(average - rounded_bid_price) < (average * .3)):
+                    isCorrect = True
                 price_quantity = {
                     'bid_price': rounded_bid_price,
                     'bid_quantity': rounded_bid_quantity,
-                    'isFound': True
+                    'isFound': isCorrect
                 }
                 return price_quantity
         price_quantity = {
@@ -330,7 +335,7 @@ async def minAsk(exchange, market, total_markets, min_USD_for_trade = 1000):
     USDmarket = market[0:3] + "/USD"
     USDCmarket = market[0:3] + "/USDC"
     USDTmarket = market[0:3] + "/USDT"
-    try: 
+    try:
         if USDmarket in total_markets:
             finalmarket = USDmarket
             USDdepth = await exchange.fetch_order_book(symbol=finalmarket)
@@ -359,10 +364,15 @@ async def minAsk(exchange, market, total_markets, min_USD_for_trade = 1000):
             if ask[1] > min_quantity:
                 rounded_ask_price = round(float(ask[0]),amount_digits_rounded)
                 rounded_ask_quantity = round(float(ask[1]),amount_digits_rounded)
+                isCorrect = False
+                ticker = exchange.fetch_ticker(symbol=market)
+                average = (ticker['high'] + ticker['low']) / 2
+                if (abs(average - rounded_ask_price) < (average * .3)):
+                    isCorrect = True
                 price_quantity = {
                     'ask_price': rounded_ask_price,
                     'ask_quantity': rounded_ask_quantity,
-                    'isFound': True
+                    'isFound': isCorrect
                 }
                 return price_quantity
         price_quantity = {
