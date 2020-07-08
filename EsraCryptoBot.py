@@ -42,7 +42,17 @@ async def config_arbitrages():
     markets = {}
     list_of_lists_of_arb_lists = []
     for exch in ccxtpro.exchanges:  # initialize Exchange
-        exchange1 = getattr(ccxtpro, exch)()
+        filtered_exchanges = ['binance', 'bequant', 'binanceje', 'binanceus', 'bitfinex', 'bitmex', 'bitstamp', 'bittrex', 'bitvavo', 'coinbaseprime', 'coinbasepro', 'ftx', 'gateio', 'hitbtc', 'huobijp', 
+                                'huobipro', 'huobiru', 'kraken', 'kucoin', 'okcoin', 'okex', 'phemex', 'poloniex', 'upbit']
+        if exch not in filtered_exchanges:
+            continue
+        if exch.id == 'binance':
+            exchange1 = getattr(ccxtpro, 'binance')({
+                'apiKey': 'nF5CYuh83iNzBfZyqOcyMrSg5l0wFzg5FcAqYhuEhzAbikNpCLSjHwSGXjtYgYWo',
+                'secret': 'GaQUTvEurFvYAdFrkFNoHB9jiVyHX9gpaYOnIXPK0C3dugUKr6NHfgpzQ0ZyMfHx',
+                'timeout': 30000,
+                'enableRateLimit': True
+                })
         try:
             val = await exchange1.load_markets()
             markets = val.keys()
@@ -50,12 +60,8 @@ async def config_arbitrages():
             print('\nExchange is not loading markets.. Moving on\n')
             continue
         print("Exchange Name: {}".format(exchange1.id))
-        filtered_exchanges = ['binance', 'bequant', 'binanceje', 'binanceus', 'bitfinex', 'bitmex', 'bitstamp', 'bittrex', 'bitvavo', 'coinbaseprime', 'coinbasepro', 'ftx', 'gateio', 'hitbtc', 'huobijp', 
-                                'huobipro', 'huobiru', 'kraken', 'kucoin', 'okcoin', 'okex', 'phemex', 'poloniex', 'upbit']
-        if exchange1.id not in filtered_exchanges:
-            continue
         symbols = exchange1.symbols
-        # print(symbols)
+        # print(symbols)p
         if symbols is None:
             print("Skipping Exchange ", exch)
             print("\n-----------------\nNext Exchange\n-----------------")
@@ -240,14 +246,14 @@ async def find_tri_arb_opp(exchange, total_markets, arb_list, fee_percentage = .
         total_fee_pct = fee_percentage * 5
         print("Exchange: {}, Arbitrage: {}, Original Exchange Rate: {}, Arbitrage Exchange Rate: {}, Fee Rate: {}".format(exchange.id, arb_list, rateA, rateB, total_fee_pct))
         print("REAL PROFIT: {} \n".format(profit))
-        var = await exchange.fetch_order_book(symbol=arb_list[0])
-        await asyncio.sleep(2)
-        var1 = await exchange.fetch_order_book(symbol=arb_list[1])
-        await asyncio.sleep(2)
-        var2 = await exchange.fetch_order_book(symbol=arb_list[2])
-        print("HIGHEST BID PRICES (1): {} \n\n".format(var['bids']))
-        print("HIGHEST ASK PRICES (2): {} \n\n".format(var1['asks']))
-        print("HIGHEST BID PRICES (3): {}".format(var2['bids']))
+        # var = await exchange.fetch_order_book(symbol=arb_list[0])
+        # await asyncio.sleep(2)
+        # var1 = await exchange.fetch_order_book(symbol=arb_list[1])
+        # await asyncio.sleep(2)
+        # var2 = await exchange.fetch_order_book(symbol=arb_list[2])
+        # print("HIGHEST BID PRICES (1): {} \n\n".format(var['bids']))
+        # print("HIGHEST ASK PRICES (2): {} \n\n".format(var1['asks']))
+        # print("HIGHEST BID PRICES (3): {}".format(var2['bids']))
 
 
         #profit_spread_list.append(profit)
