@@ -7,6 +7,7 @@ import asyncio
 
 transfer_symbol = 'USDC'
 amount_digits_rounded = 5
+percentUncertaintyOverAverage = .3
 
 
 async def run():
@@ -303,7 +304,7 @@ async def maxBid(exchange, market, total_markets, min_USD_for_trade=1000):
                 isCorrect = False
                 ticker = exchange.fetch_ticker(symbol=market)
                 average = (ticker['high'] + ticker['low']) / 2
-                if (abs(average - rounded_bid_price) < (average * .3)):
+                if (abs(average - rounded_bid_price) < (average * percentUncertaintyOverAverage)):
                     isCorrect = True
                 price_quantity = {
                     'bid_price': rounded_bid_price,
@@ -367,7 +368,7 @@ async def minAsk(exchange, market, total_markets, min_USD_for_trade = 1000):
                 isCorrect = False
                 ticker = exchange.fetch_ticker(symbol=market)
                 average = (ticker['high'] + ticker['low']) / 2
-                if (abs(average - rounded_ask_price) < (average * .3)):
+                if (abs(average - rounded_ask_price) < (average * percentUncertaintyOverAverage)):
                     isCorrect = True
                 price_quantity = {
                     'ask_price': rounded_ask_price,
