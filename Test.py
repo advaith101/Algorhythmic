@@ -13,7 +13,9 @@ def run():
         'timeout': 30000
     })
     print(binance)
-    print((binance.fetch_ticker(symbol='ETH/BTC')['high'] + binance.fetch_ticker(symbol='ETH/BTC')['low'])/2)
+    ticker = exchange.fetch_ticker(symbol=market)
+    average = (ticker['high'] + ticker['low']) / 2
+    print(average)
     if binance.has['fetchOrders']:
        binance.load_markets()
        depth = binance.fetch_order_book(symbol='ETH/BTC')

@@ -360,6 +360,7 @@ async def minAsk(exchange, market, total_markets, min_USD_for_trade = 1000):
             if ask[1] > min_quantity:
                 rounded_ask_price = round(float(ask[0]),amount_digits_rounded)
                 rounded_ask_quantity = round(float(ask[1]),amount_digits_rounded)
+                isCorrect = False
                 ticker = exchange.fetch_ticker(symbol=market)
                 average = (ticker['high'] + ticker['low']) / 2
                 if (abs(average - rounded_ask_price) < (average * .3)):
