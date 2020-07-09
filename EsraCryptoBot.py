@@ -43,8 +43,8 @@ async def config_arbitrages():
     markets = {}
     list_of_lists_of_arb_lists = []
     for exch in ccxtpro.exchanges:  # initialize Exchange
-        filtered_exchanges = ['binance'] #, 'bequant', 'binanceje', 'binanceus', 'bitfinex', 'bitmex', 'bitstamp', 'bittrex', 'bitvavo', 'coinbaseprime', 'coinbasepro', 'ftx', 'gateio', 'hitbtc', 'huobijp',
-                                #'huobipro', 'huobiru', 'kraken', 'kucoin', 'okcoin', 'okex', 'phemex', 'poloniex', 'upbit']
+        filtered_exchanges = ['binance', 'bequant', 'binanceje', 'binanceus', 'bitfinex', 'bitmex', 'bitstamp', 'bittrex', 'bitvavo', 'coinbaseprime', 'coinbasepro', 'ftx', 'gateio', 'hitbtc', 'huobijp',
+                                'huobipro', 'huobiru', 'kraken', 'kucoin', 'okcoin', 'okex', 'phemex', 'poloniex', 'upbit']
         if exch not in filtered_exchanges:
             continue
         if exch == 'binance':
@@ -212,13 +212,16 @@ async def find_tri_arb_opp(exchange, total_markets, arb_list, fee_percentage = .
         # Compare to determine if Arbitrage opp exists
     try:
         if exch_rate_list[0] != 0 and exch_rate_list[1] != 0 and exch_rate_list[2] != 0:
-            if exch_rate_list[0] < exch_rate_list[1]/exch_rate_list[2]:
+            if exch_rate_list[0]*exch_rate_list[2]/exch_rate_list[1] > 1:
                 # calculate real rate!!!
-                exchangeratespread = (exch_rate_list[1]/exch_rate_list[2]) - exch_rate_list[0]
+                exchangeratespread = exch_rate_list[0]*exch_rate_list[2]/exch_rate_list[1] - 1
                 opp_exch_rate_list = exch_rate_list
+                print(exchangeratespread)
                 print("Arbitrage Possibility")
             else:
                 # print("No Arbitrage Possibility")
+                exchangeratespread = exch_rate_list[0]*exch_rate_list[2]/exch_rate_list[1] - 1
+                print(exchangeratespread)
                 return None
         else:
             print("One of the exchange rates is 0. No Arbitrage Possibility")
@@ -235,12 +238,12 @@ async def find_tri_arb_opp(exchange, total_markets, arb_list, fee_percentage = .
     time_list = 0.0  # time of data collection
     profit = 0.0  # Record % profit
     try:
-        rateA = (exch_rate_list[0])
-        rateB = (exch_rate_list[1]/exch_rate_list[2])
+        rateA = 1/(exch_rate_list[0])
+        rateB = 1/((exch_rate_list[1]/exch_rate_list[2]))
         rateB_fee = ((exch_rate_list[1]/exch_rate_list[2])*(1-fee_percentage)*(1-fee_percentage))
         price1 = (exch_rate_list[1])
         price2 = (exch_rate_list[2])
-        profit = ((rateB - rateA)/rateA) - (fee_percentage * 5)
+        profit = ((rateA/exch_rate_list[1]) * exch_rate_list[2] - 1) - (fee_percentage * 5)
     except:
         print("One of the rates is 0. Which means minAsk or maxBid returned 0 for ask_price or bid_price respectively. Which prolly means no asks or bids > 100$.")
     if profit > 0 and rateA != 0 and rateB != 0:
@@ -249,10 +252,9 @@ async def find_tri_arb_opp(exchange, total_markets, arb_list, fee_percentage = .
         total_fee_pct = fee_percentage * 5
         print("Exchange: {}, Arbitrage: {}, Original Exchange Rate: {}, Arbitrage Exchange Rate: {}, Fee Rate: {}".format(exchange.id, arb_list, rateA, rateB, total_fee_pct))
         print("REAL PROFIT: {} \n".format(profit))
+        print("PROFIT IN DOLLARS: {}".format(profit * opp_quantity_list[0] * dollar_exchrate))
         var = await exchange.fetch_order_book(symbol=arb_list[0])
-        await asyncio.sleep(2)
         var1 = await exchange.fetch_order_book(symbol=arb_list[1])
-        await asyncio.sleep(2)
         var2 = await exchange.fetch_order_book(symbol=arb_list[2])
         # print("HIGHEST BID PRICES (1): {} \n\n".format(var['bids']))
         # print("LOWEST ASK PRICES (2): {} \n\n".format(var1['asks']))
