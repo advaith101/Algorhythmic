@@ -18,8 +18,8 @@ async def run():
 
     list_of_lists_of_arb_lists = await config_arbitrages()
     while 1:
-        profit_spread_list, profit_dollars_list = await execute_all_tri_arb_orders(list_of_lists_of_arb_lists)
-        await compute_avg_spread(profit_spread_list, profit_dollars_list)
+        profit_spread_list, profit_dollars_list, quantity_list = await execute_all_tri_arb_orders(list_of_lists_of_arb_lists)
+        await compute_avg_spread(profit_spread_list, profit_dollars_list, quantity_list)
         print("\n\n---------------CYCLE FINISHED---------------\n\n")
         #For now we can choose to continue with next cycle
         x = input("Do you want to start next cycle? (y/n)")
@@ -43,10 +43,10 @@ async def config_arbitrages():
     markets = {}
     list_of_lists_of_arb_lists = []
     for exch in ccxtpro.exchanges:  # initialize Exchange
-        filtered_exchanges = ['binance', 'bequant', 'binanceje', 'binanceus', 'bitfinex', 'bitmex', 'bitstamp', 'bittrex', 'bitvavo', 'coinbaseprime', 'coinbasepro', 'ftx', 'gateio', 'hitbtc', 'huobijp',
-                                'huobipro', 'huobiru', 'kraken', 'kucoin', 'okcoin', 'okex', 'phemex', 'poloniex', 'upbit']
-        if exch not in filtered_exchanges:
-            continue
+        # filtered_exchanges = ['binance', 'bequant', 'binanceje', 'binanceus', 'bitfinex', 'bitmex', 'bitstamp', 'bittrex', 'bitvavo', 'coinbaseprime', 'coinbasepro', 'ftx', 'gateio', 'hitbtc', 'huobijp',
+        #                         'huobipro', 'huobiru', 'kraken', 'kucoin', 'okcoin', 'okex', 'phemex', 'poloniex', 'upbit']
+        # if exch not in filtered_exchanges:
+        #     continue
         if exch == 'binance':
             exchange1 = getattr(ccxtpro, 'binance')({
                 'apiKey': 'nF5CYuh83iNzBfZyqOcyMrSg5l0wFzg5FcAqYhuEhzAbikNpCLSjHwSGXjtYgYWo',
@@ -145,6 +145,7 @@ async def execute_all_tri_arb_orders(list_of_lists_of_arb_lists):
     #Determines profitability and executes profitable orders.
     profit_spread_list = []
     profit_dollars_list = []
+    quantity_list1 =[]
     for list_of_arb_lists in list_of_lists_of_arb_lists:
         exchange = list_of_arb_lists[0]
         markets = list_of_arb_lists[2]
@@ -157,6 +158,7 @@ async def execute_all_tri_arb_orders(list_of_lists_of_arb_lists):
             try:
                 if(arbitrageopp['profit'] > 0.0):
                     profit_spread_list.append(arbitrageopp['profit'])
+                    quantity_list1.append([arbitrageopp['sym_list'][0], arbitrageopp['quantity_list'][0]])
                     profit_dollars_list.append(arbitrageopp['profit_in_dollars'])
                     quantity_list = arbitrageopp['quantity_list']
                     # await pre_tri_arb_USD_transfer(arbitrageopp['exchange'], arbitrageopp['sym_list'], arbitrageopp['fee_percentage'], quantity_list[0])
@@ -165,7 +167,7 @@ async def execute_all_tri_arb_orders(list_of_lists_of_arb_lists):
                     print("\nOrdering should be complete by this point\n")
             except:
                 print("\n\nNo Arbitrage Possibility\n\n")
-    return profit_spread_list, profit_dollars_list
+    return profit_spread_list, profit_dollars_list, quantity_list1
 
 
 async def find_tri_arb_opp(exchange, total_markets, arb_list, fee_percentage = .001):
@@ -257,11 +259,12 @@ async def find_tri_arb_opp(exchange, total_markets, arb_list, fee_percentage = .
         print("--------------------------- \n")
         total_fee_pct = fee_percentage * 5
         print("Exchange: {}, Arbitrage: {}, Original Exchange Rate: {}, Arbitrage Exchange Rate: {}, Fee Rate: {}".format(exchange.id, arb_list, rateA, rateB, total_fee_pct))
-        print("REAL PROFIT: {} \n".format(profit))
-        print("PROFIT IN DOLLARS: {}".format(profit * opp_quantity_list[0] * dollar_exchrate))
-        var = await exchange.fetch_order_book(symbol=arb_list[0])
-        var1 = await exchange.fetch_order_book(symbol=arb_list[1])
-        var2 = await exchange.fetch_order_book(symbol=arb_list[2])
+        print("REAL PROFIT: {}".format(profit))
+        print("QUANTITY OF STARTING COIN: {} \n".format(opp_quantity_list[0]))
+        # print("PROFIT IN DOLLARS: {}".format(profit * opp_quantity_list[0] * dollar_exchrate))
+        # var = await exchange.fetch_order_book(symbol=arb_list[0])
+        # var1 = await exchange.fetch_order_book(symbol=arb_list[1])
+        # var2 = await exchange.fetch_order_book(symbol=arb_list[2])
         # print("HIGHEST BID PRICES (1): {} \n\n".format(var['bids']))
         # print("HIGHEST ASK PRICES (2): {} \n\n".format(var1['asks']))
         # print("HIGHEST BID PRICES (3): {}".format(var2['bids']))
@@ -286,19 +289,19 @@ async def maxBid(exchange, market, total_markets, count, min_USD_for_trade=1000)
     try:
         dollar_exchrate = 0.0
         await exchange.load_markets()
-        if count == 0:
-            USDmarket = market[0:3] + "/USD"
-            USDCmarket = market[0:3] + "/USDC"
-            USDTmarket = market[0:3] + "/USDT"
-            if USDmarket in exchange.symbols:
-                USDdepth = await exchange.fetch_order_book(symbol=USDmarket)
-                dollar_exchrate = USDdepth['bids'][0][0]
-            elif USDCmarket in exchange.symbols:
-                USDCdepth = await exchange.fetch_order_book(symbol=USDCmarket)
-                dollar_exchrate = USDCdepth['bids'][0][0]
-            elif USDTmarket in exchange.symbols:
-                USDTdepth = await exchange.fetch_order_book(symbol=USDTmarket)
-                dollar_exchrate = USDTdepth['bids'][0][0]
+        # if count == 0:
+        #     USDmarket = market[0:3] + "/USD"
+        #     USDCmarket = market[0:3] + "/USDC"
+        #     USDTmarket = market[0:3] + "/USDT"
+        #     if USDmarket in exchange.symbols:
+        #         USDdepth = await exchange.fetch_order_book(symbol=USDmarket)
+        #         dollar_exchrate = USDdepth['bids'][0][0]
+        #     elif USDCmarket in exchange.symbols:
+        #         USDCdepth = await exchange.fetch_order_book(symbol=USDCmarket)
+        #         dollar_exchrate = USDCdepth['bids'][0][0]
+        #     elif USDTmarket in exchange.symbols:
+        #         USDTdepth = await exchange.fetch_order_book(symbol=USDTmarket)
+        #         dollar_exchrate = USDTdepth['bids'][0][0]
         
         depth = await exchange.fetch_order_book(symbol=market)
         price_quantity = {
@@ -430,13 +433,18 @@ async def post_tri_arb_USD_transfer(exchange,  sym_list, fee_percentage, quantit
         print("Could not complete order.")
 
 
-async def compute_avg_spread(profit_spread_list, profit_dollars_list):
+async def compute_avg_spread(profit_spread_list, profit_dollars_list, quantity_list):
     sum_spread = 0
     sum_dollars = 0
     num = 0
+
     for i in range(0, len(profit_spread_list)):
         sum_spread += profit_spread_list[i]
         sum_dollars += profit_dollars_list[i]
+        print("MARKET: {}".format(quantity_list[i][0]))
+        print("INITIAL QUANTITY OF STARTING COIN: {}".format(quantity_list[i][1]))
+        print("SPREAD: {}".format(profit_dollars_list[i]))
+        print("PROFIT IN TERMS OF STARTING COIN:{}".format(profit_dollars_list[i]*quantity_list[i][1]))
         num += 1
     try:
         print("AVERAGE SPREAD: {}".format(sum_spread/num))
