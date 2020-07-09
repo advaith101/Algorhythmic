@@ -504,11 +504,13 @@ async def compute_avg_spread(profit_spread_list):
     for spread in profit_spread_list:
         sum_spread += spread
         num += 1
-    print("AVERAGE SPREAD: {}".format(sum_spread/num))
-    print("AVERAGE PROFIT VOLUME (assuming all trades have the volume of $1000): {}".format((sum_spread/num)*1000))
-    print("NUMBER OF TRADES: {}".format(num))
-    print("TOTAL PROFIT VOLUME (from this cycle): {}".format(sum_spread*1000))
-    return sum_spread/num
+    try:
+        print("AVERAGE SPREAD: {}".format(sum_spread/num))
+        print("AVERAGE PROFIT IN DOLLARS: {}".format(sum_dollars/num))
+        print("NUMBER OF TRADES: {}".format(num))
+        print("TOTAL PROFIT VOLUME (from this cycle in dollars): {}".format(sum_dollars))
+    except:
+        print("found no profitable spreads!")
 
 
 
