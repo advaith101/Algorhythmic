@@ -5,7 +5,6 @@ import random
 from pprint import pprint
 import asyncio
 
-transfer_symbol = 'USDC'
 amount_digits_rounded = 5
 percentUncertaintyOverAverage = .3
 
@@ -410,7 +409,7 @@ async def pre_tri_arb_USD_transfer(exchange, sym_list, fee_percentage, initial_q
                         timeInForce=TIME_IN_FORCE_GTC)
         else:
             print("Could not complete order.")
-        print("Pre Tri Arb Coin Transfer Complete")
+        checkForOpenOrder(exchange, USDmarket)
     except:
         print("Market Not Found")
 
@@ -437,7 +436,7 @@ def tri_arb_orders(exchange, exch_rate_list, sym_list, quantity_list, fee_percen
                         timeInForce=TIME_IN_FORCE_GTC)
     else:
         print("Could not complete order.")
-    print('Tri Arb Order 1 Complete')
+    checkForOpenOrder(exchange, sym_list[0])
     #Second Order - Coin 3 from Coin 2 -
     price_order_2 = round(1/exch_rate_list[int(1)], amount_digits_rounded)
     non_fee_adjusted_quantity_2 = initial_quantity_traded/exch_rate_list[0]
@@ -452,6 +451,7 @@ def tri_arb_orders(exchange, exch_rate_list, sym_list, quantity_list, fee_percen
                         timeInForce=TIME_IN_FORCE_GTC)
     else:
         print("Could not complete order.")
+    checkForOpenOrder(exchange, sym_list[1])
     #Third Order - Starting Coin from Coin 3 -
     price_order_3 = round(float(exch_rate_list[int(2)]),amount_digits_rounded)
     non_fee_adjusted_quantity_3 = fee_adjusted_quantity_2/exch_rate_list[1]
@@ -466,6 +466,7 @@ def tri_arb_orders(exchange, exch_rate_list, sym_list, quantity_list, fee_percen
                         timeInForce=TIME_IN_FORCE_GTC)
     else:
         print("Could not complete order.")
+    checkForOpenOrder(exchange, sym_list[2])
     return fee_adjusted_quantity_3
 
 async def post_tri_arb_USD_transfer(exchange,  sym_list, fee_percentage, quantity_3):
@@ -487,6 +488,16 @@ async def post_tri_arb_USD_transfer(exchange,  sym_list, fee_percentage, quantit
     else:
         print("Could not complete order.")
 
+def checkForOpenOrder(exchange, market):
+    isOpenOrder = True
+    check = exchange.fetchOpenOrders(symbol= market)
+    while isOpenOrder:
+        if (len(check) == 0):
+            isOpenOrder = False
+        time.sleep(5)
+        check = exchange.fetchOpenOrders(symbol= market)
+        print(check)
+    print("Order is Complete")
 
 async def compute_avg_spread(profit_spread_list):
     sum_spread = 0

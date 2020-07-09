@@ -3,7 +3,6 @@ import datetime
 import time
 import random
 from pprint import pprint
-import asyncio
 
 def run():
     binance = ccxt.binance({
@@ -13,7 +12,7 @@ def run():
         'timeout': 30000
     })
     print(binance)
-    ticker = exchange.fetch_ticker(symbol=market)
+    ticker = binance.fetch_ticker(symbol='ETH/BTC')
     average = (ticker['high'] + ticker['low']) / 2
     print(average)
     if binance.has['fetchOrders']:
@@ -27,11 +26,17 @@ def run():
        lowestBid = depth['bids'][len(depth['bids']) - 1][0]
        print("Current Diff:", highestBid - lowestAsk)
        print("Possible Diff:", highestBid, lowestBid, highestAsk, lowestAsk)
-    if binance.has['fetchOpenOrders']:
-       depth = binance.fetchOpenOrders('ETH/BTC')
-       print("Open Order Book: ", depth)
-    if binance.has['fetchClosedOrders']:
-       depth = binance.fetch_closed_orders(symbol='ETH/BTC')
-       print("Closed Order Book: ", depth)
+       checkForOpenOrder(ccxt.binance(), 'ETH/BTC')
+
+def checkForOpenOrder(exchange, market):
+    isOpenOrder = True
+    check = exchange.fetchOpenOrders(symbol= market)
+    while isOpenOrder:
+        if (len(check) == 0):
+            isOpenOrder = False
+        time.sleep(1)
+        check = exchange.fetchOpenOrders(symbol= market)
+        print(check)
+    print("Order is Complete")
 
 run()
