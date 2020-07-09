@@ -43,7 +43,19 @@ async def config_arbitrages():
     markets = {}
     list_of_lists_of_arb_lists = []
     for exch in ccxtpro.exchanges:  # initialize Exchange
-        exchange1 = getattr(ccxtpro, exch)()
+        filtered_exchanges = ['binance'] #, 'bequant', 'binanceje', 'binanceus', 'bitfinex', 'bitmex', 'bitstamp', 'bittrex', 'bitvavo', 'coinbaseprime', 'coinbasepro', 'ftx', 'gateio', 'hitbtc', 'huobijp',
+                                #'huobipro', 'huobiru', 'kraken', 'kucoin', 'okcoin', 'okex', 'phemex', 'poloniex', 'upbit']
+        if exch not in filtered_exchanges:
+            continue
+        if exch == 'binance':
+            exchange1 = getattr(ccxtpro, 'binance')({
+                'apiKey': 'nF5CYuh83iNzBfZyqOcyMrSg5l0wFzg5FcAqYhuEhzAbikNpCLSjHwSGXjtYgYWo',
+                'secret': 'GaQUTvEurFvYAdFrkFNoHB9jiVyHX9gpaYOnIXPK0C3dugUKr6NHfgpzQ0ZyMfHx',
+                'timeout': 30000,
+                'enableRateLimit': True
+                })
+        else:
+            exchange1 = getattr(ccxtpro, exch)()
         try:
             val = await exchange1.load_markets()
             markets = val.keys()
@@ -51,10 +63,6 @@ async def config_arbitrages():
             print('\nExchange is not loading markets.. Moving on\n')
             continue
         print("Exchange Name: {}".format(exchange1.id))
-        filtered_exchanges = ['binance', 'bequant', 'binanceje', 'binanceus', 'bitfinex', 'bitmex', 'bitstamp', 'bittrex', 'bitvavo', 'coinbaseprime', 'coinbasepro', 'ftx', 'gateio', 'hitbtc', 'huobijp',
-                                'huobipro', 'huobiru', 'kraken', 'kucoin', 'okcoin', 'okex', 'phemex', 'poloniex', 'upbit']
-        if exchange1.id not in filtered_exchanges:
-            continue
         symbols = exchange1.symbols
         # print(symbols)
         if symbols is None:
@@ -158,7 +166,7 @@ async def execute_all_tri_arb_orders(list_of_lists_of_arb_lists):
     return profit_spread_list
 
 
-async def find_tri_arb_opp(exchange, total_markets, arb_list, fee_percentage = .001):
+async def find_tri_arb_opp(exchange, total_markets, arb_list, fee_percentage = .002):
     # Determine Rates for our 3 currency pairs - order book
     await exchange.load_markets()
     opp_exch_rate_list = []
@@ -246,9 +254,9 @@ async def find_tri_arb_opp(exchange, total_markets, arb_list, fee_percentage = .
         var1 = await exchange.fetch_order_book(symbol=arb_list[1])
         await asyncio.sleep(2)
         var2 = await exchange.fetch_order_book(symbol=arb_list[2])
-        print("HIGHEST BID PRICES (1): {} \n\n".format(var['bids']))
-        print("HIGHEST ASK PRICES (2): {} \n\n".format(var1['asks']))
-        print("HIGHEST BID PRICES (3): {}".format(var2['bids']))
+        # print("HIGHEST BID PRICES (1): {} \n\n".format(var['bids']))
+        # print("LOWEST ASK PRICES (2): {} \n\n".format(var1['asks']))
+        # print("HIGHEST BID PRICES (3): {}".format(var2['bids']))
 
 
         #profit_spread_list.append(profit)
@@ -302,7 +310,7 @@ async def maxBid(exchange, market, total_markets, min_USD_for_trade=1000):
                 rounded_bid_price = round(float(bid[0]),amount_digits_rounded)
                 rounded_bid_quantity = round(float(bid[1]),amount_digits_rounded)
                 isCorrect = False
-                ticker = exchange.fetch_ticker(symbol=market)
+                ticker = await exchange.fetch_ticker(symbol=market)
                 average = (ticker['high'] + ticker['low']) / 2
                 if (abs(average - rounded_bid_price) < (average * percentUncertaintyOverAverage)):
                     isCorrect = True
@@ -366,7 +374,7 @@ async def minAsk(exchange, market, total_markets, min_USD_for_trade = 1000):
                 rounded_ask_price = round(float(ask[0]),amount_digits_rounded)
                 rounded_ask_quantity = round(float(ask[1]),amount_digits_rounded)
                 isCorrect = False
-                ticker = exchange.fetch_ticker(symbol=market)
+                ticker = await exchange.fetch_ticker(symbol=market)
                 average = (ticker['high'] + ticker['low']) / 2
                 if (abs(average - rounded_ask_price) < (average * percentUncertaintyOverAverage)):
                     isCorrect = True
