@@ -155,7 +155,7 @@ async def execute_all_tri_arb_orders(list_of_lists_of_arb_lists):
             arbitrageopp = await find_tri_arb_opp(exchange, markets, arb_list)
             try:
                 if arbitrageopp['profit'] > 0.0:
-                    if arb_list[0][-3:] == 'BUSD'
+                    if arb_list[0][-3:] == 'BUSD':
                         profit_spread_list.append(arbitrageopp['profit'])
                         profit_dollars_list.append(arbitrageopp['profit_in_dollars'])
                         market_depth_dollars_list.appned(arbitrageopp['market_depth_dollars'])
