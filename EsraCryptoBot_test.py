@@ -160,10 +160,6 @@ async def execute_all_tri_arb_orders(list_of_lists_of_arb_lists):
         exchange = list_of_arb_lists[0]
         markets = list_of_arb_lists[2]
         for arb_list in list_of_arb_lists[1]:
-            # print("{} \n".format(exchange1))
-            # print("{} \n".format(markets))
-            # print("{} \n".format(arb_list))
-            # arbitrageopp = asyncio.gather(await find_tri_arb_opp(exchange1, list(markets), arb_list))
             arbitrageopp = await find_tri_arb_opp(exchange, markets, arb_list)
             try:
                 if(arbitrageopp['profit'] > 0.0):
@@ -188,6 +184,9 @@ async def find_tri_arb_opp(exchange, total_markets, arb_list, fee_percentage = .
     opp_max_bid_price_quantity = []
     list_exch_rate_list = []
     exch_rate_list = []
+    bid1_list = []
+    ask_list = []
+    bid2_list = []
     dollar_exchrate = 0.0
     i = 0
     count = 0
@@ -197,14 +196,12 @@ async def find_tri_arb_opp(exchange, total_markets, arb_list, fee_percentage = .
         if sym in exchange.symbols:
             if i % 2 == 0:
                 opp_max_bid_price_quantity = await maxBid(exchange, sym, total_markets, count)
-                # assumed trade volume of $100
                 if opp_max_bid_price_quantity['isFound']:
                     exch_rate_list.append(opp_max_bid_price_quantity['bid_price'])
-                    print("Max Bid Price: {}".format(opp_max_bid_price_quantity['bid_price']))
                     opp_quantity_list.append(opp_max_bid_price_quantity['bid_quantity'])
+                    bid1_list.append([opp_max_bid_price_quantity['bid_price'],opp_max_bid_price_quantity['bid_quantity']])
                     if count == 0:
                         dollar_exchrate = opp_max_bid_price_quantity['dollar_exchrate']
-                    # opp_max_bid_price_quantity['bid_quantity']
                 else:
                     print("\nCould not find a bid_price or bid_quantity\n")
                     break
