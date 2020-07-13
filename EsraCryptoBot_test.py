@@ -43,14 +43,22 @@ async def config_arbitrages():
     markets = {}
     list_of_lists_of_arb_lists = []
     for exch in ccxtpro.exchanges:  # initialize Exchange
-        # filtered_exchanges = ['binance', 'bequant', 'binanceje', 'binanceus', 'bitfinex', 'bitmex', 'bitstamp', 'bittrex', 'bitvavo', 'coinbaseprime', 'coinbasepro', 'ftx', 'gateio', 'hitbtc', 'huobijp',
+        # filtered_exchanges = [ 'binance', 'coinbase' 'bequant', 'binanceje', 'binanceus', 'bitfinex', 'bitmex', 'bitstamp', 'bittrex', 'bitvavo', 'coinbaseprime', 'coinbasepro', 'ftx', 'gateio', 'hitbtc', 'huobijp',
         #                         'huobipro', 'huobiru', 'kraken', 'kucoin', 'okcoin', 'okex', 'phemex', 'poloniex', 'upbit']
-        # if exch not in filtered_exchanges:
-        #     continue
-        if exch == 'binance':
-            exchange1 = getattr(ccxtpro, 'binance')({
+        filtered_exchanges = ['binanceus']
+        if exch not in filtered_exchanges:
+            continue
+        if exch == 'binanceus':
+            exchange1 = getattr(ccxtpro, 'binanceus')({
                 'apiKey': 'nF5CYuh83iNzBfZyqOcyMrSg5l0wFzg5FcAqYhuEhzAbikNpCLSjHwSGXjtYgYWo',
                 'secret': 'GaQUTvEurFvYAdFrkFNoHB9jiVyHX9gpaYOnIXPK0C3dugUKr6NHfgpzQ0ZyMfHx',
+                'timeout': 30000,
+                'enableRateLimit': True
+                })
+        elif exch == 'coinbase':
+            exchange1 = getattr(ccxtpro, 'coinbase')({
+                'apiKey': '4pUQ6RrdifyAObzH',
+                'secret': 'vJcrS1EOhlmiP4jdvTR11NWljeXM0RDr',
                 'timeout': 30000,
                 'enableRateLimit': True
                 })
@@ -59,6 +67,7 @@ async def config_arbitrages():
         try:
             val = await exchange1.load_markets()
             markets = val.keys()
+            # pprint(await exchange1.fetch_order_book(symbol='BTC/USD'))
         except:
             print('\nExchange is not loading markets.. Moving on\n')
             continue
@@ -131,8 +140,9 @@ async def config_arbitrages():
                     j += 1
                     # proceed = False
                 if len(arb_list) > 2:
-                    if arb_list[0] in markets and arb_list[1] in markets and arb_list[2] in markets:
-                        print(arb_list)
+                    # print(arb_list[2])
+                    if arb_list[2] in exchange1.symbols:
+                        # print(arb_list)
                         list_of_arb_lists.append(arb_list)
 
             print("\nList of Arbitrage Symbols:", list_of_arb_lists)
@@ -220,15 +230,15 @@ async def find_tri_arb_opp(exchange, total_markets, arb_list, fee_percentage = .
         # Compare to determine if Arbitrage opp exists
     try:
         if exch_rate_list[0] != 0 and exch_rate_list[1] != 0 and exch_rate_list[2] != 0:
-            if exch_rate_list[0]*exch_rate_list[2]/exch_rate_list[1] > 1:
+            if (1/exch_rate_list[0])*exch_rate_list[1]/exch_rate_list[2] > 1:
                 # calculate real rate!!!
-                exchangeratespread = exch_rate_list[0]*exch_rate_list[2]/exch_rate_list[1] - 1
+                exchangeratespread = (1/exch_rate_list[0])*exch_rate_list[1]/exch_rate_list[2] - 1
                 opp_exch_rate_list = exch_rate_list
                 print(exchangeratespread)
                 print("Arbitrage Possibility")
             else:
                 # print("No Arbitrage Possibility")
-                exchangeratespread = exch_rate_list[0]*exch_rate_list[2]/exch_rate_list[1] - 1
+                exchangeratespread = (1/exch_rate_list[0])*exch_rate_list[1]/exch_rate_list[2] - 1
                 print(exchangeratespread)
                 return None
         else:
@@ -251,7 +261,7 @@ async def find_tri_arb_opp(exchange, total_markets, arb_list, fee_percentage = .
         rateB_fee = ((exch_rate_list[1]/exch_rate_list[2])*(1-fee_percentage)*(1-fee_percentage))
         price1 = (exch_rate_list[1])
         price2 = (exch_rate_list[2])
-        profit = ((rateA/exch_rate_list[1]) * exch_rate_list[2] - 1) - (fee_percentage * 5)
+        profit = ((1/exch_rate_list[0])*exch_rate_list[1]/exch_rate_list[2] - 1) - (fee_percentage * 5)
     except:
         print("One of the rates is 0. Which means minAsk or maxBid returned 0 for ask_price or bid_price respectively. Which prolly means no asks or bids > 100$.")
     if profit > 0 and rateA != 0 and rateB != 0:
@@ -259,8 +269,8 @@ async def find_tri_arb_opp(exchange, total_markets, arb_list, fee_percentage = .
         print("--------------------------- \n")
         total_fee_pct = fee_percentage * 5
         print("Exchange: {}, Arbitrage: {}, Original Exchange Rate: {}, Arbitrage Exchange Rate: {}, Fee Rate: {}".format(exchange.id, arb_list, rateA, rateB, total_fee_pct))
-        print("REAL PROFIT: {}".format(profit))
-        print("QUANTITY OF STARTING COIN: {} \n".format(opp_quantity_list[0]))
+        print("REAL PROFIT (BEST CASE SCENARIO): {}".format(profit))
+        print("QUANTITY OF STARTING COIN: {} \n".format(exch_rate_list[0]*opp_quantity_list[0]))
         # print("PROFIT IN DOLLARS: {}".format(profit * opp_quantity_list[0] * dollar_exchrate))
         # var = await exchange.fetch_order_book(symbol=arb_list[0])
         # var1 = await exchange.fetch_order_book(symbol=arb_list[1])
@@ -304,9 +314,10 @@ async def maxBid(exchange, market, total_markets, count, min_USD_for_trade=1000)
         #         dollar_exchrate = USDTdepth['bids'][0][0]
         
         depth = await exchange.fetch_order_book(symbol=market)
+        # print(depth)
         price_quantity = {
             'bid_price': depth['bids'][0][0],
-            'bid_quantity': depth['bids'][1][0],
+            'bid_quantity': depth['bids'][0][1],
             'isFound': True,
             'dollar_exchrate': dollar_exchrate
         }
@@ -443,8 +454,8 @@ async def compute_avg_spread(profit_spread_list, profit_dollars_list, quantity_l
         sum_dollars += profit_dollars_list[i]
         print("MARKET: {}".format(quantity_list[i][0]))
         print("INITIAL QUANTITY OF STARTING COIN: {}".format(quantity_list[i][1]))
-        print("SPREAD: {}".format(profit_dollars_list[i]))
-        print("PROFIT IN TERMS OF STARTING COIN:{}".format(profit_dollars_list[i]*quantity_list[i][1]))
+        print("SPREAD: {}".format(profit_spread_list[i]))
+        print("PROFIT IN TERMS OF STARTING COIN:{}".format(profit_spread_list[i]*quantity_list[i][1]))
         num += 1
     try:
         print("AVERAGE SPREAD: {}".format(sum_spread/num))
