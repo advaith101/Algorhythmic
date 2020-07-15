@@ -43,11 +43,11 @@ async def config_arbitrages():
     markets = {}
     list_of_lists_of_arb_lists = []
     for exch in ccxtpro.exchanges:  # initialize Exchange
-        filtered_exchanges = [ 'binance', 'coinbase' 'bequant', 'binanceje', 'binanceus', 'bitfinex', 'bitmex', 'bitstamp', 'bittrex', 'bitvavo', 'coinbaseprime', 'coinbasepro', 'ftx', 'gateio', 'hitbtc', 'huobijp',
-                                'huobipro', 'huobiru', 'kraken', 'kucoin', 'okcoin', 'okex', 'phemex', 'poloniex', 'upbit']
-        # filtered_exchanges = ['binanceus']
-        if exch not in filtered_exchanges:
-            continue
+        # filtered_exchanges = [ 'binance', 'coinbase' 'bequant', 'binanceje', 'binanceus', 'bitfinex', 'bitmex', 'bitstamp', 'bittrex', 'bitvavo', 'coinbaseprime', 'coinbasepro', 'ftx', 'gateio', 'hitbtc', 'huobijp',
+        #                         'huobipro', 'huobiru', 'kraken', 'kucoin', 'okcoin', 'okex', 'phemex', 'poloniex', 'upbit']
+        # # filtered_exchanges = ['binanceus']
+        # if exch not in filtered_exchanges:
+        #     continue
         if exch == 'binanceus':
             exchange1 = getattr(ccxtpro, 'binanceus')({
                 'apiKey': 'nF5CYuh83iNzBfZyqOcyMrSg5l0wFzg5FcAqYhuEhzAbikNpCLSjHwSGXjtYgYWo',
@@ -387,7 +387,7 @@ async def compute_avg_spread(profit_spread_list, profit_dollars_list, quantity_l
 
     for i in range(0, len(profit_spread_list)):
         sum_spread += profit_spread_list[i]
-        sum_dollars += profit_dollars_list[i]
+        # sum_dollars += profit_dollars_list[i]
         print("MARKET: {}".format(quantity_list[i][0]))
         print("INITIAL QUANTITY OF STARTING COIN: {}".format(quantity_list[i][1]))
         print("SPREAD: {}".format(profit_spread_list[i]))
