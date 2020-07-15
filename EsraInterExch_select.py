@@ -5,6 +5,7 @@ import time
 import random
 from pprint import pprint
 import asyncio
+import numpy as np
 
 #initialize symbol dictionary: keys are symbols, values are list of exchanges that offer that symbol
 set_of_symbols = {}
@@ -21,12 +22,13 @@ async def run():
 		market = input("\nWhich symbol would you like to display arbmatrix for?")
 		while market not in set_of_symbols and market != 'T':
 			market = input("Invalid Input: Market not in set of symbols. Which symbol would you like to display?")
-		if market == 'T':
+		if market in ['T', 't']:
 			break
 		arbmatrix = await compute_arbmatrix(market)
 		print("\nYOUR SYMBOL: {}".format(market))
+		print("SET OF EXCHANGES THAT OFFER SYMBOL: {}".format(set_of_symbols[market]))
 		print("ARB MATRIX:\n")
-		pprint(arbmatrix)
+		pprint(np.matrix(arbmatrix))
 		print("\n\n---------------CYCLE FINISHED---------------\n\n")
 
 		
