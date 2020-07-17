@@ -100,8 +100,8 @@ async def config_arbitrages():
                             # print(final)
                             if final in exchange1.symbols:
                                 arb_list.append(final)
-                            elif arb_list[1].split('/')[1] + '/' + str(arb_list[0].split('/')[1]) in exchange1.symbols:
-                                arb_list.append(arb_list[1].split('/')[1] + '/' + str(arb_list[0].split('/')[1]))
+                            # elif arb_list[1].split('/')[1] + '/' + str(arb_list[0].split('/')[1]) in exchange1.symbols:
+                            #     arb_list.append(arb_list[1].split('/')[1] + '/' + str(arb_list[0].split('/')[1]))
                         break
                     for sym in symbols:
                         if sym in arb_list:
@@ -135,16 +135,23 @@ async def execute_all_tri_arb_orders(list_of_lists_of_arb_lists):
         exchange = list_of_arb_lists[0]
         markets = list_of_arb_lists[2]
         for arb_list in list_of_arb_lists[1]:
-            arbitrageopp = await find_tri_arb_opp1(exchange, markets, arb_list)
+            if arb_list[0].split('/')[1] != 'USD':
+                arbitrageopp = await find_tri_arb_opp1(exchange, markets, arb_list)
+            else:
+                arbitrageopp = await find_tri_arb_opp1(exchange, markets, arb_list)
             try:
                 if(arbitrageopp['profit'] > 0.0):
+                    symbol1 = markets[0].split('/')[0]
+                    USDmarket = symbol1 + '/USD'
+                    USD_order_book = fetch_order_book(symbol = USDmarket)
                     profit_spread_list.append(arbitrageopp['profit'])
                     quantity_list1.append([arbitrageopp['sym_list'][0], arbitrageopp['quantity_list'][0]])
                     profit_dollars_list.append(arbitrageopp['profit_in_dollars'])
                     quantity_list = arbitrageopp['quantity_list']
+
                     # await pre_tri_arb_USD_transfer(arbitrageopp['exchange'], arbitrageopp['sym_list'], arbitrageopp['fee_percentage'], quantity_list[0])
                     # quantity_3 = tri_arb_orders(arbitrageopp['exchange'], arbitrageopp['exch_rate_list'], arbitrageopp['sym_list'], arbitrageopp['quantity_list'], arbitrageopp['fee_percentage'])
-                    # await post_tri_arb_USD_transfer(arbitrageopp['exchange'],  arbitrageopp['sym_list'], arbitrageopp['fee_percentage'], quantity_3)
+                    # await post_tri_arb_USD_transfer(arbitrageopp['exchange'],  arbitrageopp['sym_list'], arbitrageopp['fee_percentage'], quantity_list[2])
                     print("\nOrdering should be complete by this point\n")
             except:
                 print("\n\nNo Arbitrage Possibility\n\n")
@@ -165,70 +172,78 @@ async def find_tri_arb_opp1(exchange, total_markets, arb_list, fee_percentage = 
     i = 0
     count = 0
     print("\nChecking for profit: ")
-    if arb_list[2] == arb_list[0].split('/')[1] + '/' + arb_list[1].split('/')[1]: 
-        max_bid = await maxBid(exchange, arb_list[0], total_markets, count)
-        min_ask = await minAsk(exchange, arb_list[1], total_markets, count)
-        max_bid1 = await maxBid(exchange, arb_list[2], total_markets, count)
-        if min_ask['isFound'] and max_bid['isFound'] and max_bid1['isFound']:
-            spread = ((1/max_bid['bid_price']) * min_ask['ask_price'] * (1/max_bid1['bid_price'])) - 1
-            print(spread)
-            fee_adjusted_spread = spread - (fee_percentage*5)
-            if spread > 0:
-                if fee_adjusted_spread > 0:
-                    print("FOUND PROFITABLE ARBITRAGE \n")
-                    print("--------------------------- \n")
-                    print("Exchange: {}, Arbitrage: {}".format(exchange.id, arb_list))
-                    print("REAL PROFIT (BEST CASE SCENARIO): {}".format(fee_adjusted_spread))
-                    print("QUANTITY OF STARTING COIN (BEST CASE): {} \n".format(max_bid['bid_price'] * max_bid['bid_quantity']))
-                    arbitrage = {
-                        'exchange': exchange,
-                        'exch_rate_list': [max_bid['bid_price'], min_ask['ask_price'], max_bid1['bid_price']],
-                        'sym_list': arb_list,
-                        'profit': spread,
-                        'quantity_list': [max_bid['bid_quantity'], min_ask['ask_quantity'], max_bid1['bid_quantity']],
-                        'fee_percentage': fee_percentage
-                    }
-                    return arbitrage
-
-                else:
-                    print("Found Possible Arb but fees are too high")
-                    return None
-            else:
-                print("Not a possible arbitrage")
-                return None
+    print(arb_list)
+    try:
+        orderbook1 = await exchange.fetch_order_book(symbol=arb_list[0])
+        orderbook2 = await exchange.fetch_order_book(symbol=arb_list[1])
+        orderbook3 = await exchange.fetch_order_book(symbol=arb_list[2])
+        max_bid = orderbook1['bids'][0]
+        min_ask = orderbook2['asks'][0]
+        max_bid1 = orderbook3['bids'][0]
+    except:
+        print ("Has no bids or asks for one of the markets OR not loading orderbook")
         return None
+    try:
+        usd_market = arb_list[0].split('/')[1] + '/USD'
+        usd_orderbook = await exchange.fetch_order_book(symbol=arb_list[0].split('/')[1] + '/USD')
+        max_dollar_exch_bid = usd_orderbook['bids'][0]
+        min_dollar_exch_ask = usd_orderbook['asks'][0]
+    except:
+        try:
+            usd_market = arb_list[0].split('/')[1] + '/USDC'
+            usd_orderbook = await exchange.fetch_order_book(symbol=arb_list[0].split('/')[1] + '/USDC')
+            max_dollar_exch_bid = usd_orderbook['bids'][0]
+            min_dollar_exch_ask = usd_orderbook['asks'][0]
+        except:
+            try:
+                usd_market = arb_list[0].split('/')[1] + '/BUSD'
+                usd_orderbook = await exchange.fetch_order_book(symbol=arb_list[0].split('/')[1] + '/BUSD')
+                max_dollar_exch_bid = usd_orderbook['bids'][0]
+                min_dollar_exch_ask = usd_orderbook['asks'][0]
+            except:
+                try:
+                    usd_market = arb_list[0].split('/')[1] + '/USDT'
+                    usd_orderbook = await exchange.fetch_order_book(symbol=arb_list[0].split('/')[1] + '/USDT')
+                    max_dollar_exch_bid = usd_orderbook['bids'][0]
+                    min_dollar_exch_ask = usd_orderbook['asks'][0]
+                except:
+                    try:
+                        usd_market = arb_list[0].split('/')[1] + '/USDN'
+                        usd_orderbook = await exchange.fetch_order_book(symbol=arb_list[0].split('/')[1] + '/USDN')
+                        max_dollar_exch_bid = usd_orderbook['bids'][0]
+                        min_dollar_exch_ask = usd_orderbook['asks'][0]
+                    except:
+                        print("Could not find compatible USD market for starting coin :(")
+                        # if arb_list[0].split('/')[1] != 'USD'
+                        return None
+    spread = ((1/max_bid[0]) * min_ask[0] * (1/max_bid1[0])) - 1
+    print(spread)
+    fee_adjusted_spread = spread - (fee_percentage*5)
+    depths = await findLowestDepth(max_dollar_exch_bid, max_bid, min_ask, max_bid1, min_dollar_exch_ask, fee_adjusted_spread)
+    if spread > 0:
+        if fee_adjusted_spread > 0:
+            print("FOUND PROFITABLE ARBITRAGE \n")
+            print("--------------------------- \n")
+            print("Exchange: {}, Arbitrage: {}".format(exchange.id, arb_list))
+            print("REAL PROFIT (BEST CASE SCENARIO): {}".format(fee_adjusted_spread))
+            print("QUANTITY OF STARTING COIN (BEST CASE): {} \n".format(max_bid[0] * max_bid[1]))
+            arbitrage = {
+                'exchange': exchange,
+                'exch_rate_list': [max_bid[0], min_ask[0], max_bid1[0]],
+                'sym_list': arb_list,
+                'profit': spread,
+                'quantity_list': [max_bid[1], min_ask[1], max_bid1[1]],
+                'fee_percentage': fee_percentage
+            }
+            return arbitrage
+
+        else:
+            print("Found Possible Arb but fees are too high")
+            return None
     else:
-        max_bid = await maxBid(exchange, arb_list[0], total_markets, count)
-        min_ask = await minAsk(exchange, arb_list[1], total_markets, count)
-        min_ask1 = await minAsk(exchange, arb_list[2], total_markets, count)
-        if min_ask['isFound'] and max_bid['isFound'] and min_ask1['isFound']:
-            spread = ((1/max_bid['bid_price']) * min_ask['ask_price'] * min_ask1['ask_price']) - 1
-            print(spread)
-            fee_adjusted_spread = spread - (fee_percentage*5)
-            if spread > 0:
-                if fee_adjusted_spread > 0:
-                    print("FOUND PROFITABLE ARBITRAGE \n")
-                    print("--------------------------- \n")
-                    print("Exchange: {}, Arbitrage: {}".format(exchange.id, arb_list))
-                    print("REAL PROFIT (BEST CASE SCENARIO): {}".format(fee_adjusted_spread))
-                    print("QUANTITY OF STARTING COIN (BEST CASE): {} \n".format(max_bid['bid_price'] * max_bid['bid_quantity']))
-                    arbitrage = {
-                        'exchange': exchange,
-                        'exch_rate_list': [max_bid['bid_price'], min_ask['ask_price'], min_ask1['ask_price']],
-                        'sym_list': arb_list,
-                        'profit': spread,
-                        'quantity_list': [max_bid['bid_quantity'], min_ask['ask_quantity'], min_ask1['ask_quantity']],
-                        'fee_percentage': fee_percentage
-                    }
-                    return arbitrage
-
-                else:
-                    print("Found Possible Arb but fees are too high")
-                    return None
-            else:
-                print("Not a possible arbitrage")
-                return None
+        print("Not a possible arbitrage")
         return None
+    return None
 
 
 async def find_tri_arb_opp(exchange, total_markets, arb_list, fee_percentage = .001):
@@ -246,122 +261,121 @@ async def find_tri_arb_opp(exchange, total_markets, arb_list, fee_percentage = .
     i = 0
     count = 0
     print("\nChecking for profit: ")
-    if arb_list[2] == arb_list[0].split('/')[1] + '/' + arb_list[1].split('/')[1]: 
-        min_ask = await minAsk(exchange, arb_list[0], total_markets, count)
-        max_bid = await maxBid(exchange, arb_list[1], total_markets, count)
-        min_ask1 = await minAsk(exchange, arb_list[2], total_markets, count)
-        if min_ask['isFound'] and max_bid['isFound'] and min_ask1['isFound']:
-            spread = ((1/min_ask['ask_price']) * max_bid['bid_price'] * (1/min_ask1['ask_price'])) - 1
-            print(spread)
-            fee_adjusted_spread = spread - (fee_percentage*5)
-            if spread > 0:
-                if fee_adjusted_spread > 0:
-                    print("FOUND PROFITABLE ARBITRAGE \n")
-                    print("--------------------------- \n")
-                    print("Exchange: {}, Arbitrage: {}".format(exchange.id, arb_list))
-                    print("REAL PROFIT (BEST CASE SCENARIO): {}".format(fee_adjusted_spread))
-                    print("QUANTITY OF STARTING COIN (BEST CASE): {} \n".format(min_ask['ask_price'] * min_ask['ask_quantity']))
-                    arbitrage = {
-                        'exchange': exchange,
-                        'exch_rate_list': [min_ask['ask_price'], max_bid['bid_price'], min_ask1['ask_price']],
-                        'sym_list': arb_list,
-                        'profit': spread,
-                        'quantity_list': [min_ask['ask_quantity'], max_bid['bid_quantity'], min_ask1['ask_quantity']],
-                        'fee_percentage': fee_percentage
-                    }
-                    return arbitrage
+    print(arb_list)
+    min_ask = await minAsk(exchange, arb_list[0], total_markets, count)
+    max_bid = await maxBid(exchange, arb_list[1], total_markets, count)
+    min_ask1 = await minAsk(exchange, arb_list[2], total_markets, count)
+    if min_ask['isFound'] and max_bid['isFound'] and min_ask1['isFound']:
+        # market_depth_USD = await compute_depth(exchange, arb_list, min_ask, max_bid, min_ask1)
+        spread = ((1/min_ask['ask_price']) * max_bid['bid_price'] * (1/min_ask1['ask_price'])) - 1
+        print(spread)
+        fee_adjusted_spread = spread - (fee_percentage*5)
+        if spread > 0:
+            if fee_adjusted_spread > 0:
+                print("FOUND PROFITABLE ARBITRAGE \n")
+                print("--------------------------- \n")
+                print("Exchange: {}, Arbitrage: {}".format(exchange.id, arb_list))
+                print("REAL PROFIT (BEST CASE SCENARIO): {}".format(fee_adjusted_spread))
+                print("QUANTITY OF STARTING COIN (BEST CASE): {} \n".format(min_ask['ask_price'] * min_ask['ask_quantity']))
+                arbitrage = {
+                    'exchange': exchange,
+                    'exch_rate_list': [min_ask['ask_price'], max_bid['bid_price'], min_ask1['ask_price']],
+                    'sym_list': arb_list,
+                    'profit': spread,
+                    'quantity_list': [min_ask['ask_quantity'], max_bid['bid_quantity'], min_ask1['ask_quantity']],
+                    'fee_percentage': fee_percentage
+                }
+                return arbitrage
 
-                else:
-                    print("Found Possible Arb but fees are too high")
-                    return None
             else:
-                print("Not a possible arbitrage")
+                print("Found Possible Arb but fees are too high")
                 return None
-        return None
-    else:
-        min_ask = await minAsk(exchange, arb_list[0], total_markets, count)
-        max_bid = await maxBid(exchange, arb_list[1], total_markets, count)
-        max_bid1 = await maxBid(exchange, arb_list[2], total_markets, count)
-        if min_ask['isFound'] and max_bid['isFound'] and max_bid1['isFound']:
-            spread = ((1/min_ask['ask_price']) * max_bid['bid_price'] * max_bid1['bid_price']) - 1
-            print(spread)
-            fee_adjusted_spread = spread - (fee_percentage*5)
-            if spread > 0:
-                if fee_adjusted_spread > 0:
-                    print("FOUND PROFITABLE ARBITRAGE \n")
-                    print("--------------------------- \n")
-                    print("Exchange: {}, Arbitrage: {}".format(exchange.id, arb_list))
-                    print("REAL PROFIT (BEST CASE SCENARIO): {}".format(fee_adjusted_spread))
-                    print("QUANTITY OF STARTING COIN (BEST CASE): {} \n".format(min_ask['ask_price'] * min_ask['ask_quantity']))
-                    arbitrage = {
-                        'exchange': exchange,
-                        'exch_rate_list': [min_ask['ask_price'], max_bid['bid_price'], max_bid1['bid_price']],
-                        'sym_list': arb_list,
-                        'profit': spread,
-                        'quantity_list': [min_ask['ask_quantity'], max_bid['bid_quantity'], max_bid1['bid_quantity']],
-                        'fee_percentage': fee_percentage
-                    }
-                    return arbitrage
+        else:
+            print("Not a possible arbitrage")
+            return None
+    return None
 
-                else:
-                    print("Found Possible Arb but fees are too high")
-                    return None
-            else:
-                print("Not a possible arbitrage")
-                return None
-        return None
 
-async def maxBid(exchange, market, total_markets, count, min_USD_for_trade=1000):
-    try:
-        dollar_exchrate = 0.0
-        await exchange.load_markets()
-        # if count == 0:
-        #     USDmarket = market[0:3] + "/USD"
-        #     USDCmarket = market[0:3] + "/USDC"
-        #     USDTmarket = market[0:3] + "/USDT"
-        #     if USDmarket in exchange.symbols:
-        #         USDdepth = await exchange.fetch_order_book(symbol=USDmarket)
-        #         dollar_exchrate = USDdepth['bids'][0][0]
-        #     elif USDCmarket in exchange.symbols:
-        #         USDCdepth = await exchange.fetch_order_book(symbol=USDCmarket)
-        #         dollar_exchrate = USDCdepth['bids'][0][0]
-        #     elif USDTmarket in exchange.symbols:
-        #         USDTdepth = await exchange.fetch_order_book(symbol=USDTmarket)
-        #         dollar_exchrate = USDTdepth['bids'][0][0]
-        
-        depth = await exchange.fetch_order_book(symbol=market)
-        # print(depth)
-        price_quantity = {
-            'bid_price': depth['bids'][0][0],
-            'bid_quantity': depth['bids'][0][1],
-            'isFound': True,
-            'dollar_exchrate': dollar_exchrate
-        }
-    except:
-        price_quantity = {
-            'bid_price': 0,
-            'bid_quantity': 0,
-            'isFound': False,
-            'dollar_exchrate': 0
-        }
-    return price_quantity
+async def findLowestDepth(dollar_exch_bid, bid, ask, bid1, dollar_exch_ask, spread, available_funds_USD = 1000, fee_percentage = 0.001):
+    print("SPREAD: {}".format(spread))
+    initial_USD = dollar_exch_bid[0] * dollar_exch_bid[1]
+    print(initial_USD)
+    if initial_USD > available_funds_USD:
+        initial_USD = available_funds_USD
+    quantity_coin1 = (1-fee_percentage) * initial_USD * (1/dollar_exch_bid[0])
+    print(initial_USD, quantity_coin1)
 
-async def minAsk(exchange, market, total_markets, count, min_USD_for_trade = 1000):
-    try:
-        await exchange.load_markets()
-        depth = await exchange.fetch_order_book(symbol=market)
-        price_quantity = {
-            'ask_price': depth['asks'][0][0],
-            'ask_quantity': depth['asks'][1][0],
-            'isFound': True
-        }
-    except:
-        price_quantity = {
-            'ask_price': 0,
-            'ask_quantity': 0,
-            'isFound': False
-        }
-    return price_quantity
+    if (1/bid[0]) * quantity_coin1 > bid[1]:
+        quantity_coin1 = bid[0] * bid[1]
+        initial_USD = quantity_coin1 * dollar_exch_bid[0]
+    quantity_coin2 = (1-fee_percentage) * (1/bid[0]) * quantity_coin1
+    print(initial_USD, quantity_coin1, quantity_coin2)
+
+    if quantity_coin2 > ask[1]:
+        quantity_coin2 = ask[1]
+        quantity_coin1 =  bid[0] * quantity_coin2
+        initial_USD = quantity_coin1 * dollar_exch_bid[0]
+    quantity_coin3 = (1-fee_percentage) * ask[0] * quantity_coin2
+    print(initial_USD, quantity_coin1, quantity_coin2, quantity_coin3)
+
+    if (1/bid1[0]) * quantity_coin3 > bid1[1]:
+        quantity_coin3 = bid1[0] * bid1[1]
+        quantity_coin2 = quantity_coin3 * (1/ask[0])
+        quantity_coin1 = bid[0] * quantity_coin2
+        initial_USD = quantity_coin1 * dollar_exch_bid[0]
+    quantity_coin1_final = (1-fee_percentage) * (1/bid1[0]) * quantity_coin3
+    print(initial_USD, quantity_coin1, quantity_coin2, quantity_coin3, quantity_coin1_final)
+
+    if quantity_coin1_final > dollar_exch_ask[1]:
+        quantity_coin1_final = dollar_exch_ask[1]
+        quantity_coin3 = bid1[0] * quantity_coin1_final
+        quantity_coin2 = quantity_coin3 * (1/ask[0])
+        quantity_coin1 = bid[0] * quantity_coin2
+        initial_USD = quantity_coin1 * dollar_exch_bid[0]
+
+    final_USD = (1-fee_percentage) * dollar_exch_ask[0] * quantity_coin1_final
+    print(initial_USD, quantity_coin1, quantity_coin2, quantity_coin3, quantity_coin1_final, final_USD)
+
+    print("\nINITIAL USD INVESTMENT: {}".format(initial_USD))
+    print("FINAL USD AMOUNT: {}".format(final_USD))
+    print("CALCULATED VOLUME: {}".format(final_USD - initial_USD))
+    print("THEORETICAL VOLUME: {}".format(initial_USD * spread))
+    depths = {
+        'initial_USD': initial_USD,
+        'final_USD': final_USD,
+        'quantity_coin1': quantity_coin1,
+        'quantity_coin2': quantity_coin2,
+        'quantity_coin3': quantity_coin3,
+        'quantity_coin1_final': quantity_coin1_final
+    }
+    return depths
+
+
+async def findLowestDepth_with_USD_market(bid, ask, bid1, spread, available_funds_USD):
+    quantity_coin1 = available_funds_USD
+    if (1/bid[0]) * quantity_coin1 > bid[1]:
+        quantity_coin1 = bid[0] * bid[1]
+        initial_USD = quantity_coin1 * dollar_exch_bid[0]
+    quantity_coin2 = (1-fee_percentage) * bid[1]
+    if quantity_coin2 > ask[1]:
+        quantity_coin2 = ask[1]
+        quantity_coin1 = bid[0] * quantity_coin2
+        initial_USD = quantity_coin1 * dollar_exch_bid[0]
+    quantity_coin3 = (1-fee_percentage) * ask[0] * quantity_coin2
+    if (1/bid1[0]) * quantity_coin3 > bid1[1]:
+        quantity_coin3 = bid1[0] * bid1[1]
+        quantity_coin2 = quantity_coin3 * (1/ask[0])
+        quantity_coin1 = bid[0] * quantity_coin2
+        initial_USD = quantity_coin1 * dollar_exch_bid[0]
+    quantity_coin1_final = (1-fee_percentage) * bid1[1]
+    depths = {
+        'initial_USD': quantity_coin1,
+        'quantity_coin2': quantity_coin1,
+        'quantity_coin3': quantity_coin1,
+        'final_USD': quantity_coin1_final
+    }
+    return depths
+
 
 async def pre_tri_arb_USD_transfer(exchange, sym_list, fee_percentage, initial_quantity): #make exchange, exch_rate_list, sym_list, fee_percentage global vars
     market1 = sym_list[0]

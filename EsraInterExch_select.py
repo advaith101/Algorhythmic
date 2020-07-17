@@ -20,11 +20,11 @@ async def run():
 	while 1:
 		print("\n(press T at anytime to terminate bot)")
 		market = input("\nWhich symbol would you like to display arbmatrix for?")
-		while market not in set_of_symbols and market != 'T':
+		while market not in list(set_of_symbols.keys()) + ['T', 't']:
 			market = input("Invalid Input: Market not in set of symbols. Which symbol would you like to display?")
 		if market in ['T', 't']:
 			break
-		arbmatrix = await compute_arbmatrix(market)
+		arbmatrix = await compute_arbmatrix1(market)
 		print("\nYOUR SYMBOL: {}".format(market))
 		print("SET OF EXCHANGES THAT OFFER SYMBOL: {}".format(set_of_symbols[market]))
 		print("ARB MATRIX:\n")
@@ -128,7 +128,7 @@ async def compute_arbmatrices():
 	return
 
 
-#Computes arbmatrix for individual market
+#Computes arbmatrix for individual market (for creating market order ie fastest execution)
 async def compute_arbmatrix(sym):
 	arbmatrix = [[0]*len(set_of_symbols[sym]) for i in range(len(set_of_symbols[sym]))]
 	i = 0
@@ -166,7 +166,58 @@ async def compute_arbmatrix(sym):
 				orderbook1 = await exchange2.fetch_order_book(symbol=sym)
 				bids = orderbook1['bids']
 				max_bid = bids[0]
-				arbmatrix[i][j] = (max_bid[0]-min_ask[0])/max_bid[0]
+				arbmatrix[i][j] = (max_bid[0]-min_ask[0])/min_ask[0]
+			except Exception as inst:
+				print(type(inst))
+				print(inst.args)
+				print(inst)
+				print("Exchange not fetching orderbook or orderbook empty")
+				j += 1
+				continue
+			exchange2.close()
+			j += 1
+		i += 1
+	return arbmatrix
+
+#Computes arbmatrix for individual market (for creating limit order ie higher spreads, longer time)
+async def compute_arbmatrix1(sym):
+	arbmatrix = [[0]*len(set_of_symbols[sym]) for i in range(len(set_of_symbols[sym]))]
+	i = 0
+	for exch in set_of_symbols[sym]:
+		exchange1 = getattr(ccxtpro, exch)()
+		try:
+			await exchange1.load_markets()
+		except:
+			print("Exchange not loading markets")
+			i += 1
+			continue
+		try:
+			orderbook = await exchange1.fetch_order_book(symbol=sym)
+			print(orderbook)
+			bids = orderbook['bids']
+			max_bid = bids[0]
+		except Exception as inst:
+			print(type(inst))
+			print(inst.args)
+			print(inst)
+			print("Exchange not fetching orderbook or orderbook empty")
+			i += 1
+			continue
+		exchange1.close()
+		j = 0
+		for exch1 in set_of_symbols[sym]:
+			exchange2 = getattr(ccxtpro, exch1)()
+			try:
+				await exchange2.load_markets()
+			except:
+				print("Exchange not loading markets")
+				j += 1
+				continue
+			try:
+				orderbook1 = await exchange2.fetch_order_book(symbol=sym)
+				asks = orderbook1['asks']
+				min_ask = asks[0]
+				arbmatrix[i][j] = (min_ask[0]-max_bid[0])/max_bid[0]
 			except Exception as inst:
 				print(type(inst))
 				print(inst.args)
