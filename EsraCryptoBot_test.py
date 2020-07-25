@@ -35,7 +35,7 @@ async def run():
         if x == 'n':
             break
         continue
-        # print("CYCLE FINISHED, STARTING NEXT CYCLE...")
+        print("CYCLE FINISHED, STARTING NEXT CYCLE...")
         # await asyncio.sleep(3)
     print("\n\nEsra CryptoBot has finished running\n\n")
 
@@ -50,7 +50,7 @@ async def config_arbitrages():
     for exch in ccxtpro.exchanges:  # initialize Exchange
         # filtered_exchanges = [ 'binance', 'coinbase' 'bequant', 'binanceje', 'binanceus', 'bitfinex', 'bitmex', 'bitstamp', 'bittrex', 'bitvavo', 'coinbaseprime', 'coinbasepro', 'ftx', 'gateio', 'hitbtc', 'huobijp',
         #                         'huobipro', 'huobiru', 'kraken', 'kucoin', 'okcoin', 'okex', 'phemex', 'poloniex', 'upbit']
-        filtered_exchanges = ['binanceus', 'kraken', 'bittrex']
+        filtered_exchanges = ['kraken', 'bittrex']
         if exch not in filtered_exchanges:
             continue
         if exch == 'binanceus':
@@ -238,13 +238,14 @@ async def create_order(exchange, arbitrageopp):
                             continue
                         break
                     balances = await exchange.fetch_balance()
-                    await exchange.create_limit_buy_order(arbitrageopp['sym_list'][2], balances['free'][arbitrageopp['sym_list'][1].split('/')[1]], arbitrageopp['exch_rate_list'][2])
-                    while 1:
-                        open_orders = await exchange.fetch_open_orders(symbol=arbitrageopp['sym_list'][2])
-                        if len(open_orders) > 0:
-                            time.sleep(40)
-                            continue
-                        break
+                    if arbitrageopp['sym_list'][1].split('/')[1] != 'USD':
+                        await exchange.create_limit_buy_order(arbitrageopp['sym_list'][2], balances['free'][arbitrageopp['sym_list'][1].split('/')[1]], arbitrageopp['exch_rate_list'][2])
+                        while 1:
+                            open_orders = await exchange.fetch_open_orders(symbol=arbitrageopp['sym_list'][2])
+                            if len(open_orders) > 0:
+                                time.sleep(40)
+                                continue
+                            break
                     print('ORDER COMPLETED! :) YESSIRRR LETS GET THIS BREAD')
                 except Exception as inst:
                     print("ERROR: SOMETHING WENT WRONG WITH ORDER")
@@ -322,7 +323,8 @@ async def find_tri_arb_opp1(exchange, total_markets, arb_list, fee_percentage = 
     spread = (1/max_dollar_exch_bid[0]) * ((1/max_bid[0]) * min_ask[0] * (1/max_bid1[0])) * min_dollar_exch_ask[0] - 1
     print(spread)
     fee_adjusted_spread = spread - (fee_percentage*5)
-    depths = await findLowestDepth(max_dollar_exch_bid, max_bid, min_ask, max_bid1, min_dollar_exch_ask, fee_adjusted_spread, 1000, fee_pcts[exchange.id])# (await exchange.fetch_balance())['free'][arb_list[1].split('/')[1]])
+    #depths = await findLowestDepth(max_dollar_exch_bid, max_bid, min_ask, max_bid1, min_dollar_exch_ask, fee_adjusted_spread, (await exchange.fetch_balance())['free'][usd_market.split('/')[1]], fee_pcts[exchange.id])# (await exchange.fetch_balance())['free'][arb_list[1].split('/')[1]])
+    depths = await findLowestDepth(max_dollar_exch_bid, max_bid, min_ask, max_bid1, min_dollar_exch_ask, fee_adjusted_spread, 10000, fee_pcts[exchange.id])
     if spread > 0:
         if (depths['final_USD'] - depths['initial_USD'])/depths['initial_USD'] > 0:
             print("FOUND PROFITABLE ARBITRAGE \n")
@@ -380,13 +382,16 @@ async def find_tri_arb_opp1_USD(exchange, total_markets, arb_list, fee_percentag
     spread = ((1/max_bid[0]) * min_ask[0] * (1/max_bid1[0])) - 1
     print(spread)
     fee_adjusted_spread = spread - (fee_percentage*3)
-    depths = await findLowestDepth_with_USD_market(max_bid, min_ask, max_bid1, fee_adjusted_spread, 1000, fee_pcts[exchange.id])# (await exchange.fetch_balance())['free'][arb_list[1].split('/')[1]])
+    #Sprint((await exchange.fetch_balance())['free'][arb_list[1].split('/')[1]], fee_pcts[exchange.id])
+    #depths = await findLowestDepth_with_USD_market(max_bid, min_ask, max_bid1, fee_adjusted_spread, (await exchange.fetch_balance())['free'][arb_list[0].split('/')[1]], fee_pcts[exchange.id])# (await exchange.fetch_balance())['free'][arb_list[1].split('/')[1]])
+    depths = await findLowestDepth_with_USD_market(max_bid, min_ask, max_bid1, fee_adjusted_spread, 10000, fee_pcts[exchange.id])
     if spread > 0:
         if (depths['quantity_coin1_final'] - depths['quantity_coin1'])/depths['quantity_coin1'] > 0:
             print("FOUND PROFITABLE ARBITRAGE \n")
             print("--------------------------- \n")
             print("Exchange: {}, Arbitrage: {}".format(exchange.id, arb_list))
-            print("REAL PROFIT (BEST CASE SCENARIO): {}".format((depths['quantity_coin1_final'] - depths['quantity_coin1'])/depths['quantity_coin1']))
+            print("REAL PROFIT RATE (BEST CASE SCENARIO): {}".format((depths['quantity_coin1_final'] - depths['quantity_coin1'])/depths['quantity_coin1']))
+            print("PROFIT IN TERMS OF STARTING COIN: {}".format((depths['quantity_coin1_final'] - depths['quantity_coin1'])))
             print("QUANTITY OF STARTING COIN (BEST CASE): {} \n".format(max_bid[0] * max_bid[1]))
             print([max_bid[0], min_ask[0], max_bid1[0]])
             arbitrage = {
