@@ -124,14 +124,9 @@ async def scalp(usd_markets):
             print('\nExchange is not loading markets.. Moving on\n')
             continue
         for market in usd_markets[exch]:
-            thirty_min_candles = await exchange1.fetch_ohlcv(market, '30m')
-            # print("SYMBOL: {} \n\n".format(market))
-            # print(thirty_min_candles)
-            hour_candles = await exchange1.fetch_ohlcv(market, '1h')
-            fourhour_candles = await exchange1.fetch_ohlcv(market, '4h')
-            thirty_min_ema_15 = await calc_emas(thirty_min_candles, 15)
-            print("SYMBOL: {} \n\n".format(market))
-            thirty_min_bollingers_20 = await calc_bollingers(thirty_min_candles, 20)
+            double_ema_score = await double_ema(market, exchange1)
+            print(double_ema_score)
+
 
 
 
@@ -153,19 +148,19 @@ async def double_ema(market, exchange):
     #find general trend
     candles = await exchange.fetch_ohlcv(market, '1h')
     emas_long = await calc_emas(candles, 75)
-    x_vals = np.arange(0,len(emas))
-    y_vals = np.array(emas)
+    x_vals = np.arange(0,len(emas_long))
+    y_vals = np.array(emas_long)
     first_deg_poly = np.polyfit(x_vals, y_vals, 1)
     second_deg_poly = np.polyfit(x_vals, y_vals, 2)
-    if first_deg_poly[0] > 0.1:
-        if second_deg_poly[0] > .2:
+    if first_deg_poly[0] > 0:
+        if second_deg_poly[0] > .1:
             general_trend = 'strong bullish'
             buy_signal += 2
         else:
             general_trend = 'bullish'
             buy_signal += 1
-    elif first_deg_poly[0] < -0.1:
-        if second_deg_poly[0] < -.2:
+    elif first_deg_poly[0] < 0:
+        if second_deg_poly[0] < -.1:
             general_trend = 'strong bearish'
             sell_signal += 2
         else:
@@ -185,21 +180,25 @@ async def double_ema(market, exchange):
                 direction = "Crossed Bearish"
                 intersect_candle = (candles[-1:0:-1])[a + 15]
                 buy_signal += 4
+                break
             i = -1
         elif emas_short[a + 10] > emas_medium[a]:
             if i == -1:
                 direction = "Crossed Bullish"
                 intersect_candle = (candles[-1:0:-1])[a + 15]
                 sell_signal += 4
+                break
             i = 1
         else:
             intersect_candle = (candles[-1:0:-1])[a + 15]
             if i == -1:
                 direction = "Crossed Bearish"
                 buy_signal += 4
+                break
             elif i == 1:
                 direction = "Crossed Bullish"
                 sell_signal += 4
+                break
 
     #checks volume of intersection candle to see if "power move" is present
     if len(intersect_candle) == 0:
@@ -212,6 +211,7 @@ async def double_ema(market, exchange):
         elif direction == "Crossed Bearish":
             sell_signal += 4
     return {
+        'trend': general_trend,
         'buy_signal': buy_signal,
         'sell_signal': sell_signal
     }
