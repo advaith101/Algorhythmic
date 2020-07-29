@@ -1,42 +1,27 @@
-import ccxt
+import csv
 import datetime
-import time
 import random
 from pprint import pprint
 
-def run():
-    binance = ccxt.binance({
-        'apiKey': 'nF5CYuh83iNzBfZyqOcyMrSg5l0wFzg5FcAqYhuEhzAbikNpCLSjHwSGXjtYgYWo',
-        'secret': 'GaQUTvEurFvYAdFrkFNoHB9jiVyHX9gpaYOnIXPK0C3dugUKr6NHfgpzQ0ZyMfHx',
-        'enableRateLimit': True,
-        'timeout': 30000
-    })
-    print(binance)
-    ticker = binance.fetch_ticker(symbol='ETH/BTC')
-    average = (ticker['high'] + ticker['low']) / 2
-    print(average)
-    if binance.has['fetchOrders']:
-       binance.load_markets()
-       depth = binance.fetch_order_book(symbol='ETH/BTC')
-       print(" ASK:", depth['asks'][0], depth['asks'][len(depth['asks']) - 1])
-       print(" BID:", depth['bids'][0], depth['bids'][len(depth['bids']) - 1])
-       lowestAsk = depth['asks'][0][0]
-       highestAsk = depth['asks'][len(depth['asks']) - 1][0]
-       highestBid = depth['bids'][0][0]
-       lowestBid = depth['bids'][len(depth['bids']) - 1][0]
-       print("Current Diff:", highestBid - lowestAsk)
-       print("Possible Diff:", highestBid, lowestBid, highestAsk, lowestAsk)
-       checkForOpenOrder(ccxt.binance(), 'ETH/BTC')
+with open('triarbdata.csv', 'w') as f:
+    fieldnames = ['Bot Start Date', 'Bot Start Time', 'Exchange', 'Initial USD', 'First Market', 'Second Market', 'Third Market', 'Spread', 'Estimated Profit']
+    thewriter = csv.DictWriter(f, fieldnames = fieldnames)
+    thewriter.writeheader()
+    current_time = datetime.datetime.now()
 
-def checkForOpenOrder(exchange, market):
-    isOpenOrder = True
-    check = exchange.fetchOpenOrders(symbol= market)
-    while isOpenOrder:
-        if (len(check) == 0):
-            isOpenOrder = False
-        time.sleep(1)
-        check = exchange.fetchOpenOrders(symbol= market)
-        print(check)
-    print("Order is Complete")
+    def writeToCSV(arbitrageopp):
+        i = 0
+        if (i == 0):
+            thewriter.writerow({'Bot Start Date': current_time.date(), 'Bot Start Time': current_time.time(), 'Exchange': arbitrageopp['exchange'], 'Initial USD': arbitrageopp['initialUSD'], 'First Market': arbitrageopp['sym_list'] [0], 'Second Market': arbitrageopp['sym_list'] [1], 'Third Market': arbitrageopp['sym_list'] [2], 'Spread': arbitrageopp['spread'], 'Estimated Profit': arbitrageopp['estimated_profit']})
+        else:
+            thewriter.writerow({'Exchange': arbitrageopp['exchange'], 'Initial USD': arbitrageopp['initialUSD'], 'First Market': arbitrageopp['sym_list'] [0], 'Second Market': arbitrageopp['sym_list'] [1], 'Third Market': arbitrageopp['sym_list'] [2], 'Spread': arbitrageopp['spread'], 'Estimated Profit': arbitrageopp['estimated_profit']})
+        i+=1
+    arbitrage = {
+        'exchange': 'Binance',
+        'sym_list': ['BTC/USD', 'BTC/ETH', 'ETH/USD'],
+        'initialUSD': 200,
+        'spread': .2,
+        'estimated_profit': 300,
+    }
 
-run()
+    writeToCSV(arbitrage)
