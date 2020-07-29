@@ -8,7 +8,7 @@ from pprint import pprint
 import asyncio
 
 with open('triarbdata.csv', 'w') as f:
-    fieldnames = ['Bot Start Date', 'Bot Start Time', 'Arb Time', 'Exchange', 'Initial USD', 'First Market', 'Second Market', 'Third Market', 'Spread', 'Estimated Profit']
+    fieldnames = ['Bot_Start_Date', 'Bot_Start_Time', 'Arb_Time', 'Exchange', 'Initial_USD', 'First_Market', 'Second_Market', 'Third_Market', 'Spread', 'Estimated_Profit']
     thewriter = csv.DictWriter(f, fieldnames = fieldnames)
     thewriter.writeheader()
     current_time = datetime.datetime.now()
