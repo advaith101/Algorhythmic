@@ -124,8 +124,10 @@ async def scalp(usd_markets):
             print('\nExchange is not loading markets.. Moving on\n')
             continue
         for market in usd_markets[exch]:
-            double_ema_score = await double_ema(market, exchange1)
-            print(double_ema_score)
+            # double_ema_score = await double_ema(market, exchange1)
+            # print(double_ema_score)
+            rsi_score = await RSI_strategy(market, exchange1)
+            print("MARKET: {} \n {}".format(market, rsi_score))
 
 
 
@@ -217,8 +219,48 @@ async def double_ema(market, exchange):
     }
     
 
-
-
+async def RSI_strategy(market, exchange):
+    buy_signal = 0
+    sell_signal = 0
+    candles = (await exchange.fetch_ohlcv(market, '1h'))
+    rsi_sma, rsi_ewma = await RSI(candles, 20)
+    cout = 0
+    rsi_ewma_arr = rsi_ewma[0].tolist()
+    recent_rsi = rsi_ewma_arr[-1:-4:-1]
+    for i in range(len(recent_rsi)):
+        if recent_rsi[i] >= 80:
+            if cout == 0:
+                sell_signal += 5
+            else:
+                if recent_rsi[0] < recent_rsi[i]:
+                    sell_signal += (1/cout) * 2.5 + 2.5
+            break
+        elif recent_rsi[i] >= 70:
+            if cout == 0:
+                sell_signal += 4
+            else:
+                if recent_rsi[0] < recent_rsi[i]:
+                    sell_signal += (1/cout) * 2 + 2
+            break
+        elif recent_rsi[i] <= 20:
+            if cout == 0:
+                buy_signal += 5
+            else:
+                if recent_rsi[0] > recent_rsi[i]:
+                    buy_signal += (1/cout) * 2.5 + 2.5
+            break
+        elif recent_rsi[i] <= 30:
+            if cout == 0:
+                buy_signal += 5
+            else:
+                if recent_rsi[0] > recent_rsi[i]:
+                    buy_signal += (1/cout) * 2.5 + 2.5
+            break
+        cout += 1
+    return {
+        'buy_signal': buy_signal,
+        'sell_signal': sell_signal
+    }
 
 
 
@@ -297,6 +339,37 @@ async def calc_bollinger(close_prices, sma):
     # print("\n\nSTD: {}".format(stdev))
     return [sma + 2*stdev, sma, sma - 2*stdev]
 
+
+async def RSI(candles, length):
+    close_prices = [i[4] for i in candles]
+    close_df = pd.DataFrame(close_prices)
+    delta = close_df.diff()
+    # Get rid of the first row, which is NaN since it did not have a previous 
+    # row to calculate the differences
+    delta = delta[1:] 
+
+    # Make the positive gains (up) and negative gains (down) Series
+    up, down = delta.copy(), delta.copy()
+    up[up < 0] = 0
+    down[down > 0] = 0
+
+    # Calculate the EWMA
+    roll_up1 = up.ewm(span=length).mean()
+    roll_down1 = down.abs().ewm(span=length).mean()
+
+    # Calculate the RSI based on EWMA
+    RS1 = roll_up1 / roll_down1
+    RSI1 = 100.0 - (100.0 / (1.0 + RS1))
+
+    # Calculate the SMA
+    roll_up2 = up.rolling(length).mean()
+    roll_down2 = down.abs().rolling(length).mean()
+
+    # Calculate the RSI based on SMA
+    RS2 = roll_up2 / roll_down2
+    RSI2 = 100.0 - (100.0 / (1.0 + RS2))
+
+    return RSI1, RSI2
 
 
 
