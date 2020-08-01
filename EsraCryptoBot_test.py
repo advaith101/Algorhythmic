@@ -50,9 +50,16 @@ async def config_arbitrages():
     for exch in ccxtpro.exchanges:  # initialize Exchange
         # filtered_exchanges = [ 'binance', 'coinbase' 'bequant', 'binanceje', 'binanceus', 'bitfinex', 'bitmex', 'bitstamp', 'bittrex', 'bitvavo', 'coinbaseprime', 'coinbasepro', 'ftx', 'gateio', 'hitbtc', 'huobijp',
         #                         'huobipro', 'huobiru', 'kraken', 'kucoin', 'okcoin', 'okex', 'phemex', 'poloniex', 'upbit']
-        filtered_exchanges = ['kraken', 'bittrex']
+        filtered_exchanges = ['binance']
         if exch not in filtered_exchanges:
             continue
+        if exch == 'binance':
+            exchange1 = getattr(ccxtpro, 'binanceus')({
+                'apiKey': 'fx5DAv8aWM9R4ExwnvolbRj3wzfTVhpGgsMEAvlgqRec7phNKVOWDpJa8BgbbxwQ',
+                'secret': 'KqKpNDFkfJ9yaTcd7PcRDpcT6dq1DDl1BYxAOzWaUzQWlQQqGYZ4H2Nx7apuIxcb',
+                'timeout': 30000,
+                'enableRateLimit': True
+                })
         if exch == 'binanceus':
             exchange1 = getattr(ccxtpro, 'binanceus')({
                 'apiKey': 'W6fJUrx0LLcrdNE1GJ9B5yK0NRPMhhWjDtotxrdI3FirqUlBIzNHtWdza0TLn2Sy',
