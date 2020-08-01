@@ -10,6 +10,8 @@ import json
 import pandas as pd
 import numpy as np
 import decimal
+import matplotlib.pyplot as plt
+
 
 transfer_symbol = 'USDC'
 amount_digits_rounded = 5
@@ -128,7 +130,7 @@ async def scalp(usd_markets):
             # print(double_ema_score)
             rsi_score = await RSI_strategy(market, exchange1)
             print("MARKET: {} \n {}".format(market, rsi_score))
-
+            
 
 
 
@@ -222,11 +224,13 @@ async def double_ema(market, exchange):
 async def RSI_strategy(market, exchange):
     buy_signal = 0
     sell_signal = 0
-    candles = (await exchange.fetch_ohlcv(market, '1h'))
-    rsi_sma, rsi_ewma = await RSI(candles, 20)
+    candles = (await exchange.fetch_ohlcv(market, '4h'))
+    rsi_sma, rsi_ewma = await RSI(candles, 14)
     cout = 0
     rsi_ewma_arr = rsi_ewma[0].tolist()
-    recent_rsi = rsi_ewma_arr[-1:-4:-1]
+    recent_rsi = rsi_ewma_arr[-1:-100:-1]
+    plt.plot(recent_rsi[-1:0:-1])
+    plt.show()
     for i in range(len(recent_rsi)):
         if recent_rsi[i] >= 80:
             if cout == 0:
@@ -251,10 +255,10 @@ async def RSI_strategy(market, exchange):
             break
         elif recent_rsi[i] <= 30:
             if cout == 0:
-                buy_signal += 5
+                buy_signal += 4
             else:
                 if recent_rsi[0] > recent_rsi[i]:
-                    buy_signal += (1/cout) * 2.5 + 2.5
+                    buy_signal += (1/cout) * 2 + 2
             break
         cout += 1
     return {
