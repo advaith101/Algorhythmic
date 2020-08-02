@@ -63,13 +63,13 @@ with open('triarbdata.csv', 'w') as f:
             if exch not in filtered_exchanges:
                 continue
             if exch == 'binance':
-                exchange1 = getattr(ccxtpro, 'binanceus')({
+                exchange1 = getattr(ccxtpro, 'binance')({
                     'apiKey': 'fx5DAv8aWM9R4ExwnvolbRj3wzfTVhpGgsMEAvlgqRec7phNKVOWDpJa8BgbbxwQ',
                     'secret': 'KqKpNDFkfJ9yaTcd7PcRDpcT6dq1DDl1BYxAOzWaUzQWlQQqGYZ4H2Nx7apuIxcb',
                     'timeout': 30000,
                     'enableRateLimit': True
                     })
-            if exch == 'binanceus':
+            elif exch == 'binanceus':
                 exchange1 = getattr(ccxtpro, 'binanceus')({
                     'apiKey': 'W6fJUrx0LLcrdNE1GJ9B5yK0NRPMhhWjDtotxrdI3FirqUlBIzNHtWdza0TLn2Sy',
                     'secret': 'TIAIQHixpiIeUOXRaf3joBVJP9rHizsEcALDuadL1VAeZCsPMem3KtxRfWMYZth9',
@@ -174,9 +174,10 @@ with open('triarbdata.csv', 'w') as f:
                         profit_spread_list.append(arbitrageopp['spread'])
                         quantity_list1.append([arbitrageopp['sym_list'][0], arbitrageopp['quantity_list'][0]])
                         quantity_list = arbitrageopp['quantity_list']
+                        await create_order(exchange, arbitrageopp)
                         writeToCSV(arbitrageopp)
 
-                        # await create_order(exchange, arbitrageopp)
+                        
 
                         # await pre_tri_arb_USD_transfer(arbitrageopp['exchange'], arbitrageopp['sym_list'], arbitrageopp['fee_percentage'], quantity_list[0])
                         # quantity_3 = tri_arb_orders(arbitrageopp['exchange'], arbitrageopp['exch_rate_list'], arbitrageopp['sym_list'], arbitrageopp['quantity_list'], arbitrageopp['fee_percentage'])
@@ -195,39 +196,44 @@ with open('triarbdata.csv', 'w') as f:
         if exchange.has['fetchOpenOrders']:
             # open_orders = await exchange.fetch_open_orders()
             if 1: #len(open_orders) == 0:
-                if len(arbitrageopp['exch_rate_list']) > 3:
+                balances = await exchange.fetch_balance()
+                print(balances['free']['USDT'])
+                print(arbitrageopp['exch_rate_list'])
+                print(arbitrageopp['quantity_list'])
+                if not arbitrageopp['startswith_usd']:
                     try:
-                        await exchange.create_limit_buy_order(arbitrageopp['sym_list'][0].split('/')[1] + '/' + 'USD', arbitrageopp['quantity_list'][0], arbitrageopp['exch_rate_list'][0])
+                        await exchange.create_limit_buy_order(arbitrageopp['sym_list'][0].split('/')[1] + '/' + 'USDT', arbitrageopp['quantity_list'][0], arbitrageopp['exch_rate_list'][0])
+                        print("HIOHJOSAILDH")
                         while 1:
-                            open_orders = await exchange.fetch_open_orders(symbol=arbitrageopp['sym_list'][0].split('/')[1] + '/' + 'USD')
+                            open_orders = await exchange.fetch_open_orders(symbol=arbitrageopp['sym_list'][0].split('/')[1] + '/' + 'USDT')
                             if len(open_orders) > 0:
                                 time.sleep(120)
                                 continue
                             break
-                        await exchange.create_limit_buy_order(arbitrageopp['sym_list'][0], arbitrageopp['quantity_list'][2], arbitrageopp['exch_rate_list'][1])
+                        await exchange.create_limit_buy_order(arbitrageopp['sym_list'][0], balances['free'][arbitrageopp['sym_list'][0].split('/')[1]]*(1/arbitrageopp['exch_rate_list'][1]), arbitrageopp['exch_rate_list'][1])
                         while 1:
                             open_orders = await exchange.fetch_open_orders(symbol=arbitrageopp['sym_list'][0])
                             if len(open_orders) > 0:
                                 time.sleep(120)
                                 continue
                             break
-                        await exchange.create_limit_sell_order(arbitrageopp['sym_list'][1], arbitrageopp['quantity_list'][2], arbitrageopp['exch_rate_list'][2])
+                        await exchange.create_limit_sell_order(arbitrageopp['sym_list'][1], balances['free'][arbitrageopp['sym_list'][0].split('/')[0]], arbitrageopp['exch_rate_list'][2])
                         while 1:
                             open_orders = await exchange.fetch_open_orders(symbol=arbitrageopp['sym_list'][1])
                             if len(open_orders) > 0:
                                 time.sleep(120)
                                 continue
                             break
-                        await exchange.create_limit_buy_order(arbitrageopp['sym_list'][2], arbitrageopp['quantity_list'][4], arbitrageopp['exch_rate_list'][3])
+                        await exchange.create_limit_buy_order(arbitrageopp['sym_list'][2], balances['free'][arbitrageopp['sym_list'][1].split('/')[1]]*(1/arbitrageopp['exch_rate_list'][3]), arbitrageopp['exch_rate_list'][3])
                         while 1:
                             open_orders = await exchange.fetch_open_orders(symbol=arbitrageopp['sym_list'][2])
                             if len(open_orders) > 0:
                                 time.sleep(120)
                                 continue
                             break
-                        await exchange.create_limit_sell_order(arbitrageopp['sym_list'][0].split('/')[1] + '/' + 'USD', arbitrageopp['quantity_list'][4], arbitrageopp['exch_rate_list'][4])
+                        await exchange.create_limit_sell_order(arbitrageopp['sym_list'][0].split('/')[1] + '/' + 'USDT', balances['free'][arbitrageopp['sym_list'][2].split('/')[0]], arbitrageopp['exch_rate_list'][4])
                         while 1:
-                            open_orders = await exchange.fetch_open_orders(symbol=arbitrageopp['sym_list'][0].split('/')[1] + '/' + 'USD')
+                            open_orders = await exchange.fetch_open_orders(symbol=arbitrageopp['sym_list'][0].split('/')[1] + '/' + 'USDT')
                             if len(open_orders) > 0:
                                 time.sleep(120)
                                 continue
@@ -246,7 +252,6 @@ with open('triarbdata.csv', 'w') as f:
                                 time.sleep(40)
                                 continue
                             break
-                        balances = await exchange.fetch_balance()
                         await exchange.create_limit_sell_order(arbitrageopp['sym_list'][1], balances['free'][arbitrageopp['sym_list'][0].split('/')[0]], arbitrageopp['exch_rate_list'][1])
                         while 1:
                             open_orders = await exchange.fetch_open_orders(symbol=arbitrageopp['sym_list'][1])
@@ -341,7 +346,7 @@ with open('triarbdata.csv', 'w') as f:
         print(spread)
         fee_adjusted_spread = spread - (fee_percentage*5)
         #depths = await findLowestDepth(max_dollar_exch_bid, max_bid, min_ask, max_bid1, min_dollar_exch_ask, fee_adjusted_spread, (await exchange.fetch_balance())['free'][usd_market.split('/')[1]], fee_pcts[exchange.id])# (await exchange.fetch_balance())['free'][arb_list[1].split('/')[1]])
-        depths = await findLowestDepth(max_dollar_exch_bid, max_bid, min_ask, max_bid1, min_dollar_exch_ask, fee_adjusted_spread, 10000, fee_pcts[exchange.id])
+        depths = await findLowestDepth(max_dollar_exch_bid, max_bid, min_ask, max_bid1, min_dollar_exch_ask, fee_adjusted_spread, 10, fee_pcts[exchange.id])
         if spread > 0:
             if (depths['final_USD'] - depths['initial_USD'])/depths['initial_USD'] > 0:
                 print("FOUND PROFITABLE ARBITRAGE \n")
@@ -351,13 +356,14 @@ with open('triarbdata.csv', 'w') as f:
                 print("QUANTITY OF STARTING COIN (BEST CASE): {} \n".format(max_bid[0] * max_bid[1]))
                 arbitrage = {
                     'exchange': exchange,
-                    'exch_rate_list': [max_bid[0], min_ask[0], max_bid1[0]],
+                    'exch_rate_list': [max_dollar_exch_bid[0], max_bid[0], min_ask[0], max_bid1[0], min_dollar_exch_ask[0]],
                     'sym_list': arb_list,
                     'spread': (depths['final_USD'] - depths['initial_USD'])/depths['initial_USD'],
                     'initialUSD': depths['initial_USD'],
                     'estimated_profit': spread * depths['initial_USD'],
-                    'quantity_list': [max_bid[1], min_ask[1], max_bid1[1]],
-                    'fee_percentage': fee_percentage
+                    'quantity_list': [max_dollar_exch_bid[1], max_bid[1], min_ask[1], max_bid1[1], min_dollar_exch_ask[1]],
+                    'fee_percentage': fee_percentage,
+                    'startswith_usd': False
                 }
                 return arbitrage
 
@@ -403,7 +409,7 @@ with open('triarbdata.csv', 'w') as f:
         fee_adjusted_spread = spread - (fee_percentage*3)
         #Sprint((await exchange.fetch_balance())['free'][arb_list[1].split('/')[1]], fee_pcts[exchange.id])
         #depths = await findLowestDepth_with_USD_market(max_bid, min_ask, max_bid1, fee_adjusted_spread, (await exchange.fetch_balance())['free'][arb_list[0].split('/')[1]], fee_pcts[exchange.id])# (await exchange.fetch_balance())['free'][arb_list[1].split('/')[1]])
-        depths = await findLowestDepth_with_USD_market(max_bid, min_ask, max_bid1, fee_adjusted_spread, 10000, fee_pcts[exchange.id])
+        depths = await findLowestDepth_with_USD_market(max_bid, min_ask, max_bid1, fee_adjusted_spread, 10, fee_pcts[exchange.id])
         if spread > 0:
             if (depths['quantity_coin1_final'] - depths['quantity_coin1'])/depths['quantity_coin1'] > 0:
                 print("FOUND PROFITABLE ARBITRAGE \n")
@@ -421,7 +427,8 @@ with open('triarbdata.csv', 'w') as f:
                     'initialUSD': depths['initial_USD'],
                     'estimated_profit': spread * depths['initial_USD'],
                     'quantity_list': [max_bid[1], min_ask[1], max_bid1[1]],
-                    'fee_percentage': fee_percentage
+                    'fee_percentage': fee_percentage,
+                    'startswith_usd': True
                 }
                 return arbitrage
 
@@ -460,7 +467,7 @@ with open('triarbdata.csv', 'w') as f:
             spread = ((1/min_ask['ask_price']) * max_bid['bid_price'] * (1/min_ask1['ask_price'])) - 1
             print(spread)
             fee_adjusted_spread = spread - (fee_percentage*5)
-            depths = await findLowestDepth_with_USD_market(max_bid, min_ask, max_bid1, fee_adjusted_spread, 10000, fee_pcts[exchange.id])
+            depths = await findLowestDepth_with_USD_market(max_bid, min_ask, max_bid1, fee_adjusted_spread, 10, fee_pcts[exchange.id])
             if spread > 0:
                 if fee_adjusted_spread > 0:
                     print("FOUND PROFITABLE ARBITRAGE \n")
