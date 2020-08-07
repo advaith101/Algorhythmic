@@ -20,30 +20,40 @@ import oandapyV20.endpoints.positions as positions
 import oandapyV20.endpoints.pricing as pricing
 import oandapyV20.endpoints.trades as trades
 import oandapyV20.endpoints.transactions as transactions
+from oandapyV20.contrib.requests import MarketOrderRequest
+import trendln
 
 
-#account info
-accountID = "001-001-4630515-001"
-access_token = "1d8b241d70c8860beb0a0a8455e48e5f-3390fae9470905f3edf39b2b8c49e0df"
+#account info for live acct.
+# accountID = "001-001-4630515-001"
+# access_token = "1d8b241d70c8860beb0a0a8455e48e5f-3390fae9470905f3edf39b2b8c49e0df"
 
-oanda = API(environment="live", access_token=access_token)
+#account info for practice acct.
+accountID = "101-001-16023947-001"
+access_token = "9a5cae7cbfacf5f6aa634097bc1bc337-b394ef6856186107ebfdc589260269bf"
+
+# oanda = API(environment="live", access_token=access_token)
+oanda = API(access_token=access_token)
 fee_pct = 0.0 # YESSIRRR OANDA IS FREE COMMISSION
 
 
 async def run():
 	#triarb strategy
-	tri_arbs = await config_arbitrages()
-	print("\n\n---------------TRIANGULAR ARBITRAGRE CONFIGURATION FINISHED---------------\n\n")
-	x = input("Now finding which arbs are profitable. Do you want to place actual orders? (y/n)")
-	order_mode = False
-	if x == 'y':
-		order_mode = True
-	for arb in tri_arbs:
-		await execute_tri_arb(arb, order_mode)
-	print("\n-------------------------TRIANGULAR ARBITRAGRES FINISHED------------------------------\n")
+	# tri_arbs = await config_arbitrages()
+	# print("\n\n---------------TRIANGULAR ARBITRAGRE CONFIGURATION FINISHED---------------\n\n")
+	# x = input("Now finding which arbs are profitable. Do you want to place actual orders? (y/n)")
+	# order_mode = False
+	# if x == 'y':
+	# 	order_mode = True
+	# count = 0
+	# for arb in tri_arbs:
+	# 	b = await execute_tri_arb(arb, order_mode, count)
+	# 	if not b:
+	# 		count += 1
+	# print("\n-------------------------TRIANGULAR ARBITRATION FINISHED------------------------------\n")
 	print("Starting master strategy... \n")
 	await asyncio.sleep(3)
-	await scalp()
+	scores_by_market = await scalp()
 
 
 	# while 1:
@@ -102,25 +112,73 @@ async def config_arbitrages():
 	return list_of_arb_lists
 
 
-async def execute_tri_arb(arb_list, order_mode):
-	profit, depth = await find_profit(arb_list, fee_pct, 'market')
+async def execute_tri_arb(arb_list, order_mode, count):
+	profit, depth, prices = await find_profit(arb_list, fee_pct, 'market')
 	if profit > 0.0:
 		print("FOUND PROFITABLE ARBITRAGE \n")
 		print("--------------------------- \n")
 		print("Arbitrage Symbols: {}".format(arb_list))
 		print("REAL PROFIT RATE: {}".format(profit))
 		print("DEPTH: {} (This is forex, we dont even have to worry lol)".format(depth))
-		if order_mode:
-			#Create order here - needs to be finished
-			pass
+		# if order_mode:
+		# 	#Create order here - needs to be finished
+		# 	funds = await get_available_funds()
+		# 	if count == 0:
+		# 		order1, order2, order3 = await asyncio.ensure_future(create_triarb_order(arb_list, prices, funds))
+		return True
+			
 	else:
 		print("Not profitable :(")
+		return False
 
 
+
+async def create_triarb_order(arb_list, prices, available_funds):
+	#funds = available_funds/2 #don't want to alot all our money to tri arb
+	order1 = {
+	  "order": {
+	    "price": str(prices[0]),
+	    "timeInForce": "GTC",
+	    "instrument": arb_list[0].replace('/','_'),
+	    "units": "20",
+	    "type": "LIMIT",
+	    "positionFill": "DEFAULT"
+	  }
+	}
+	order2 = {
+	  "order": {
+	    "price": str(prices[1]),
+	    "timeInForce": "GTC",
+	    "instrument": arb_list[1].replace('/','_'),
+	    "units": "-20",
+	    "type": "LIMIT",
+	    "positionFill": "DEFAULT"
+	  }
+	}
+	order3 = {
+	  "order": {
+	    "price": str(prices[2]),
+	    "timeInForce": "GTC",
+	    "instrument": arb_list[2].replace('/','_'),
+	    "units": str(20 * prices[1] * (1/prices[2])),
+	    "type": "LIMIT",
+	    "positionFill": "DEFAULT"
+	  }
+	}
+	order1_task = oanda.request(orders.OrderCreate(accountID, data=order1))
+	order2_task = oanda.request(orders.OrderCreate(accountID, data=order2))
+	order3_task = oanda.request(orders.OrderCreate(accountID, data=order3))
+	return order1_task, order2_task, order3_task
+
+async def get_available_funds():
+	available_funds = oanda.request(accounts.AccountDetails(accountID))['account']['NAV']
+	print("NET ACCOUNT VALUE: {}".format(available_funds))
+	return available_funds
 
 async def find_profit(arb_list, fee_pct, strategy):
 	spread = 0.0
 	depth = 0.0
+	prices = []
 	params ={
 		'instruments': '{},{},{}'.format(arb_list[0].replace('/','_'), arb_list[1].replace('/','_'), arb_list[2].replace('/','_'))
 	}
@@ -131,13 +189,15 @@ async def find_profit(arb_list, fee_pct, strategy):
 		max_bid1 = orderbook[2]['bids'][0]
 		spread = ((1/float(max_bid['price'])) * float(min_ask['price']) * (1/float(max_bid1['price']))) - 1
 		depth = max_bid1['liquidity']
+		prices = [float(max_bid['price']), float(min_ask['price']), float(max_bid1['price'])]
 	elif strategy == 'market':
 		min_ask = orderbook[0]['bids'][0]
 		max_bid = orderbook[1]['asks'][0]
 		min_ask1 = orderbook[2]['bids'][0]
 		spread = ((1/float(min_ask['price'])) * float(max_bid['price']) * (1/float(min_ask1['price']))) - 1
 		depth = min_ask1['liquidity']
-	return spread, depth
+		prices = [float(min_ask['price']), float(max_bid['price']), float(min_ask1['price'])]
+	return spread, depth, prices
 
 
 
@@ -157,18 +217,69 @@ async def find_profit(arb_list, fee_pct, strategy):
 
 ### Master Strategy Stuff ###
 
-async def scalp():
-	instruments = oanda.request(accounts.AccountInstruments(accountID))["instruments"]
-	symbols = [instrument['name'] for instrument in instruments]
-	symbols_display = [instrument['displayName'] for instrument in instruments]
+#NEEDS TO BE DONE (place "DONE" next to it if complete):
+#	1. add volatility indicator and refine double ema and rsi strategy
+#	(DONE - NEEDS REFINING) 2. add support/resistance 
+#	(DONE - NEEDS REFINING) 3. add MACD
+#	4. add points of value strategy
+#	5. get feedback - log P/L's and strategy scores for each position once it is closed. This will be used as a learner.
+#	6. add Randomized Weighted Majority Algorithm to optimize weights for strategies over time
+
+async def scalp(order_mode=False):
+	instruments1 = oanda.request(accounts.AccountInstruments(accountID))["instruments"]
+	symbols = [instrument['name'] for instrument in instruments1]
+	symbols_display = [instrument['displayName'] for instrument in instruments1]
+	scores_by_market = []
+	i = 0
 	for market in symbols:
+		scores_by_market.append({
+				'market': market,
+				'strategy_scores': []
+			})
 		rsi_h1_score = await RSI_strategy(market, "H1")
 		double_ema_score = await double_ema(market, "H1")
+		MACD_score = await MACD_strategy(market, "H1")
 		print("MARKET: {} \n".format(market))
 		print("RSI score: {}".format(rsi_h1_score))
 		print("double EMA score: {}".format(double_ema_score))
-		
-			
+		print("MACD score: {}".format(MACD_score))
+		scores_by_market[i]['strategy_scores'].extend([rsi_h1_score, double_ema_score, MACD_score])
+		i += 1
+	j = 0
+	for marketscore in scores_by_market:
+		overallscore = {}
+		buy = 0
+		sell = 0
+		count = 0
+		for strategyscore in marketscore['strategy_scores']:
+			buy += strategyscore['buy_signal']
+			sell += strategyscore['sell_signal']
+			count += 1
+		overallscore['buy_signal'] = buy/count
+		overallscore['sell_signal'] = sell/count
+		marketscore['overall_score'] = overallscore
+		if (overallscore['buy_signal'] > 3.5 and overallscore['sell_signal'] < 2.5) or (overallscore['buy_signal'] < 2.5 and overallscore['sell_signal'] > 3.5):
+			if order_mode:
+				market_order = await asyncio.ensure_future(create_order(marketscore['market'], overallscore['buy_signal'], overallscore['sell_signal']))
+	
+
+	return scores_by_market
+
+
+
+#Function to order based on overall score for 1 market
+async def create_order(market, buy_signal, sell_signal):
+	# if buy_signal > sell_signal:
+	# 	mo = MarketOrderRequest(instrument=market, units=(buy_signal * 10000 - sell_signal * 10000))
+	# 	market_order = oanda.request(orders.OrderCreate(accountID, data=mo.data))
+	# elif sell_signal > buy_signal:
+	# 	mo = MarketOrderRequest(instrument=market, units=(buy_signal * 10000 - sell_signal * 10000))
+	mo = MarketOrderRequest(instrument=market, units=(buy_signal * 10000 - sell_signal * 10000))
+	market_order = oanda.request(orders.OrderCreate(accountID, data=mo.data))
+	#order confirmation
+	print(json.dumps(market_order, indent=4))
+	return market_order
+
 
 
 
@@ -313,6 +424,55 @@ async def RSI_strategy(market, length):
 	}
 
 
+#MACD Strategy
+async def MACD_strategy(market, length):
+	buy_signal = 0.0
+	sell_signal = 0.0
+	params = {
+		"count": 500,
+		"granularity": length
+	}
+	candles = oanda.request(instruments.InstrumentsCandles(instrument=market, params=params))['candles']
+	MACD1, signal = await MACD(candles, 80, 40, 9)
+	MACD_recent = MACD1[0].tolist()[-1:-100:-1]
+	signal_recent = signal[0].tolist()[-1:-100:-1]
+	count = 0
+	i = 0
+	direction = ''
+	intersect_candle = []
+	for a in range(len(MACD_recent)):
+		if MACD_recent[a] < signal_recent[a]:
+			if i == 1:
+				direction = "Crossed Bearish"
+				intersect_candle = (candles[-1:0:-1])[a]
+				buy_signal += 4 * 3/count
+				break
+			i = -1
+		elif MACD_recent[a] > signal_recent[a]:
+			if i == -1:
+				direction = "Crossed Bullish"
+				intersect_candle = (candles[-1:0:-1])[a]
+				sell_signal += 4 * 3/count
+				break
+			i = 1
+		else:
+			intersect_candle = (candles[-1:0:-1])[a]
+			if i == -1:
+				direction = "Crossed Bearish"
+				buy_signal += 4 * 3/count
+				break
+			elif i == 1:
+				direction = "Crossed Bullish"
+				sell_signal += 4 * 3/count
+				break
+		count += 1
+	if len(intersect_candle) == 0:
+		print("No MACD crossover found recently")
+		return None
+	return {
+		'buy_signal': buy_signal,
+		'sell_signal': sell_signal
+	}
 
 
 
@@ -423,6 +583,31 @@ async def RSI(candles, length):
 	return RSI1, RSI2
 
 
+#Calculate the MACD and Signal Line indicators
+async def MACD(candles, long_length, short_length, signal_length):
+	close_prices = [float(i['mid']['c']) for i in candles]
+	close_df = pd.DataFrame(close_prices)
+	#Calculate the Short Term Exponential Moving Average
+	ShortEMA = close_df.ewm(span=short_length, adjust=False).mean() #AKA Fast moving average
+	#Calculate the Long Term Exponential Moving Average
+	LongEMA = close_df.ewm(span=long_length, adjust=False).mean() #AKA Slow moving average
+	#Calculate the Moving Average Convergence/Divergence (MACD)
+	MACD = ShortEMA - LongEMA
+	#Calcualte the signal line
+	signal = MACD.ewm(span=signal_length, adjust=False).mean()
+	return MACD, signal
+
+
+async def support_resistance(market, candles):
+	close_prices = [float(i['mid']['c']) for i in candles]
+	data = np.array(close_prices)
+	close_series = pd.Series(data)
+	(minimaIdxs, pmin, mintrend, minwindows), (maximaIdxs, pmax, maxtrend, maxwindows) = trendln.calc_support_resistance(close_series)
+	fig = trendln.plot_support_resistance(close_series)
+	plt.savefig('suppres_{}_{}.svg'.format(market, str(datetime.now())), format='svg')
+	plt.show()
+	plt.clf()
+	return minimaIdxs, pmin, mintrend, minwindows, maximaIdxs, pmax, maxtrend, maxwindows
 
 
 
