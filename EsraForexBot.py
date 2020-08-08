@@ -137,32 +137,32 @@ async def create_triarb_order(arb_list, prices, available_funds):
 	#funds = available_funds/2 #don't want to alot all our money to tri arb
 	order1 = {
 	  "order": {
-	    "price": str(prices[0]),
-	    "timeInForce": "GTC",
-	    "instrument": arb_list[0].replace('/','_'),
-	    "units": "20",
-	    "type": "LIMIT",
-	    "positionFill": "DEFAULT"
+		"price": str(prices[0]),
+		"timeInForce": "GTC",
+		"instrument": arb_list[0].replace('/','_'),
+		"units": "20",
+		"type": "LIMIT",
+		"positionFill": "DEFAULT"
 	  }
 	}
 	order2 = {
 	  "order": {
-	    "price": str(prices[1]),
-	    "timeInForce": "GTC",
-	    "instrument": arb_list[1].replace('/','_'),
-	    "units": "-20",
-	    "type": "LIMIT",
-	    "positionFill": "DEFAULT"
+		"price": str(prices[1]),
+		"timeInForce": "GTC",
+		"instrument": arb_list[1].replace('/','_'),
+		"units": "-20",
+		"type": "LIMIT",
+		"positionFill": "DEFAULT"
 	  }
 	}
 	order3 = {
 	  "order": {
-	    "price": str(prices[2]),
-	    "timeInForce": "GTC",
-	    "instrument": arb_list[2].replace('/','_'),
-	    "units": str(20 * prices[1] * (1/prices[2])),
-	    "type": "LIMIT",
-	    "positionFill": "DEFAULT"
+		"price": str(prices[2]),
+		"timeInForce": "GTC",
+		"instrument": arb_list[2].replace('/','_'),
+		"units": str(20 * prices[1] * (1/prices[2])),
+		"type": "LIMIT",
+		"positionFill": "DEFAULT"
 	  }
 	}
 	order1_task = oanda.request(orders.OrderCreate(accountID, data=order1))
@@ -219,6 +219,7 @@ async def find_profit(arb_list, fee_pct, strategy):
 
 #NEEDS TO BE DONE (place "DONE" next to it if complete):
 #	1. add volatility indicator and refine double ema and rsi strategy
+#	(ADDED VOLATILITY INDICATOR: ATR)
 #	(DONE - NEEDS REFINING) 2. add support/resistance 
 #	(DONE - NEEDS REFINING) 3. add MACD
 #	4. add points of value strategy
@@ -239,30 +240,39 @@ async def scalp(order_mode=False):
 		rsi_h1_score = await RSI_strategy(market, "H1")
 		double_ema_score = await double_ema(market, "H1")
 		MACD_score = await MACD_strategy(market, "H1")
+		ATR_score = await ATR_strategy(market, "H1")
+		points_of_val_score = await points_of_value(market, "H1")
 		print("MARKET: {} \n".format(market))
 		print("RSI score: {}".format(rsi_h1_score))
 		print("double EMA score: {}".format(double_ema_score))
 		print("MACD score: {}".format(MACD_score))
-		scores_by_market[i]['strategy_scores'].extend([rsi_h1_score, double_ema_score, MACD_score])
-		i += 1
-	j = 0
-	for marketscore in scores_by_market:
+		print("ATR score: {}".format(MACD_score))
+		scores_by_market[i]['strategy_scores'].extend([rsi_h1_score, double_ema_score, MACD_score, ATR_score])
 		overallscore = {}
 		buy = 0
 		sell = 0
 		count = 0
-		for strategyscore in marketscore['strategy_scores']:
-			buy += strategyscore['buy_signal']
-			sell += strategyscore['sell_signal']
+		for strategyscore in scores_by_market[i]['strategy_scores']:
+			try:
+				buy += strategyscore['buy_signal']
+				sell += strategyscore['sell_signal']
+			except:
+				if buy > sell:
+					buy += strategyscore['enter_signal']
+					buy -= strategyscore['exit_signal']
+				elif sell > buy:
+					sell += strategyscore['enter_signal']
+					sell -= strategyscore['exit_signal']
 			count += 1
 		overallscore['buy_signal'] = buy/count
 		overallscore['sell_signal'] = sell/count
-		marketscore['overall_score'] = overallscore
+		scores_by_market[i]['overall_score'] = overallscore
 		if (overallscore['buy_signal'] > 3.5 and overallscore['sell_signal'] < 2.5) or (overallscore['buy_signal'] < 2.5 and overallscore['sell_signal'] > 3.5):
+			print("\nFOUND PROFITABLE TRADE OPPORTUNITY---------------")
+			print("OVERALL SCORE: {}".format(overallscore))
 			if order_mode:
-				market_order = await asyncio.ensure_future(create_order(marketscore['market'], overallscore['buy_signal'], overallscore['sell_signal']))
-	
-
+				market_order = await asyncio.ensure_future(create_order(scores_by_market[i]['market'], overallscore['buy_signal'], overallscore['sell_signal']))
+		i += 1
 	return scores_by_market
 
 
@@ -424,7 +434,7 @@ async def RSI_strategy(market, length):
 	}
 
 
-#MACD Strategy
+#MACD Strategy for crossover only
 async def MACD_strategy(market, length):
 	buy_signal = 0.0
 	sell_signal = 0.0
@@ -475,10 +485,53 @@ async def MACD_strategy(market, length):
 	}
 
 
+#Average True Range (good for checking if good time to enter market) - Enter the market when ATR recently was at local minima, exit if ATR is too high
+async def ATR_strategy(market, length):
+	enter_signal = 0.0
+	exit_signal = 0.0
+	params = {
+		"count": 500,
+		"granularity": length
+	}
+	candles = oanda.request(instruments.InstrumentsCandles(instrument=market, params=params))['candles']
+	atr = await ATR(market, candles, 50)
+	# print(type(atr), atr)
+	atr_recent = atr.tolist()[-1:-100:-1]
+	max_atr = max(atr_recent)
+	min_atr = min(atr_recent)
+	if (atr_recent[0] - min_atr)/min_atr < 0.015:
+		enter_signal += 3
+		if (atr_recent[0] - min_atr)/min_atr < 0.09:
+			enter_signal += 2
+	elif abs((atr_recent[0] - max_atr)/max_atr) < 0.015:
+		exit_signal += 3
+		if abs((atr_recent[0] - max_atr)/max_atr) < 0.09:
+			exit_signal += 2
+	return {
+		'enter_signal': enter_signal,
+		'exit_signal': exit_signal
+	}
+
+
+#points of value - needs to be finished
+async def points_of_value(market, length):
+	enter_signal = 0.0
+	exit_signal = 0.0
+	params = {
+		"count": 500,
+		"granularity": length
+	}
+	candles = oanda.request(instruments.InstrumentsCandles(instrument=market, params=params))['candles']
+	await support_resistance(market, candles)
+	return {
+		'enter_signal': enter_signal,
+		'exit_signal': exit_signal
+	}
 
 
 
-#Below are indicators that we will be using in our strategies#
+
+#Below are indicators that we will be using in our strategies
 
 
 #Calculates EMA's for each set of candles (ie if you plot it it would be the EMA)
@@ -598,17 +651,40 @@ async def MACD(candles, long_length, short_length, signal_length):
 	return MACD, signal
 
 
+#finds all support/resistance levels and support/resistance trendlines
 async def support_resistance(market, candles):
 	close_prices = [float(i['mid']['c']) for i in candles]
 	data = np.array(close_prices)
 	close_series = pd.Series(data)
 	(minimaIdxs, pmin, mintrend, minwindows), (maximaIdxs, pmax, maxtrend, maxwindows) = trendln.calc_support_resistance(close_series)
 	fig = trendln.plot_support_resistance(close_series)
-	plt.savefig('suppres_{}_{}.svg'.format(market, str(datetime.now())), format='svg')
-	plt.show()
+	# plt.savefig('suppres_{}_{}.svg'.format(market, str(datetime.now())), format='svg')
+	# plt.show()
 	plt.clf()
 	return minimaIdxs, pmin, mintrend, minwindows, maximaIdxs, pmax, maxtrend, maxwindows
 
+
+#finds average true range for set of candles
+async def ATR(market, candles, length):
+	open_prices = np.array([float(i['mid']['o']) for i in candles])
+	close_prices = np.array([float(i['mid']['c']) for i in candles])
+	highs = np.array([float(i['mid']['h']) for i in candles])
+	lows = np.array([float(i['mid']['l']) for i in candles])
+	df = pd.DataFrame({
+			'open_prices': open_prices,
+			'close_prices': close_prices,
+			'highs': highs,
+			'lows': lows
+		})
+	high = df['highs']
+	low = df['lows']
+	close = df['close_prices']
+	df['tr0'] = abs(high - low)
+	df['tr1'] = abs(high - close.shift())
+	df['tr2'] = abs(low - close.shift())
+	tr = df[['tr0', 'tr1', 'tr2']].max(axis=1)
+	atr = tr.ewm(alpha=1/length, adjust=False).mean()
+	return atr
 
 
 
