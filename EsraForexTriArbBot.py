@@ -11,6 +11,9 @@ import json
 import pandas as pd
 import numpy as np
 import decimal
+from fractions import Fraction
+from math import gcd
+from functools import reduce
 import csv
 import matplotlib.pyplot as plt
 from oandapyV20 import API
@@ -215,6 +218,19 @@ with open(csvName, 'w') as f:
             depth = min_ask1['liquidity']
             prices = [float(min_ask['price']), float(max_bid['price']), float(min_ask1['price'])]
         return spread, depth, prices
+
+    #oanda-specific: find depth that can deal with whole units as oanda only deals with whole numbers
+    def findDepthForWholeUnitsTrading(exch_rate_1, exch_rate_2, exch_rate_3):
+        multiplied_x_y = exch_rate_1 * exch_rate_2
+        multiplied_x_y_z = exch_rate_1 * exch_rate_2 * exch_rate_3
+        denominator_1 = str(Fraction(exch_rate_1).limit_denominator()).split('/') [1]
+        denominator_2 = str(Fraction(multiplied_x_y).limit_denominator()).split('/') [1]
+        denominator_3 = str(Fraction(multiplied_x_y_z).limit_denominator()).split('/') [1]
+        denominators = [int(denominator_1), int(denominator_2), int(denominator_3)]
+        return LCM(denominators)
+
+    def LCM(denominators):   #will work for an int array of any length
+        return reduce(lambda a,b: a*b // gcd(a,b), denominators)
 
     def writeToCSV(arbitrageopp):
       i = 0
