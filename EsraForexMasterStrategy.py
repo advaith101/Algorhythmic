@@ -23,6 +23,7 @@ import oandapyV20.endpoints.pricing as pricing
 import oandapyV20.endpoints.trades as trades
 import oandapyV20.endpoints.transactions as transactions
 from oandapyV20.contrib.requests import MarketOrderRequest
+from oandapyV20.contrib.requests import TrailingStopLossOrderRequest
 import trendln
 
 
@@ -42,9 +43,17 @@ fee_pct = 0.0 # YESSIRRR OANDA IS FREE COMMISSION
 current = datetime.datetime.now()
 current_time = current.time()
 
+
+
+#bot start info
+first_order = True
+first_order_id = ""
+
+
 async def run():
     print("Starting master strategy... \n")
     await asyncio.sleep(3)
+    await asyncio.ensure_future(watchman())
     scores_by_market = await scalp()
 
 ### Master Strategy Stuff ###
@@ -57,6 +66,7 @@ async def run():
 #    4. add points of value strategy
 #    5. get feedback - log P/L's and strategy scores for each position once it is closed. This will be used as a learner.
 #    6. add Randomized Weighted Majority Algorithm to optimize weights for strategies over time
+#    7. Exponential Trailing stop loss
 
 async def scalp(order_mode=False):
     instruments1 = oanda.request(accounts.AccountInstruments(accountID))["instruments"]
@@ -84,6 +94,7 @@ async def scalp(order_mode=False):
         buy = 0
         sell = 0
         count = 0
+        ## Apply Randomized Weighted Majority Algo here to optimize the weights of each strategy over time
         for strategyscore in scores_by_market[i]['strategy_scores']:
             try:
                 buy += strategyscore['buy_signal']
@@ -103,13 +114,31 @@ async def scalp(order_mode=False):
             print("\nFOUND PROFITABLE TRADE OPPORTUNITY---------------")
             print("OVERALL SCORE: {}".format(overallscore))
             if order_mode:
-                market_order = await asyncio.ensure_future(create_order(scores_by_market[i]['market'], overallscore['buy_signal'], overallscore['sell_signal']))
+                market_order, trailing_stop = await asyncio.ensure_future(create_order(scores_by_market[i]['market'], overallscore['buy_signal'], overallscore['sell_signal']))
+                order_id = market_order['orderFillTransaction']['orderID']
+                if first_order:
+                    first_order_id = order_id
+                    first_order = False
+                await asyncio.ensure_future(watch_order(order_id))
         i += 1
     return scores_by_market
 
 
+#function that watches transaction history continuosly, in parallel, to ensure nothing crazy happens. Also logs all the orders and realized/unrealized P/L
+async def watchman():
+    #needs to be completed
+    
+    pass
 
-#Function to order based on overall score for 1 market
+
+#function that monitors price for a market that we've opened a new position for and sells when it detects reversal
+async def watch_order(order_id):
+    #needs to be completed
+    pass
+
+
+
+#Function to order based on overall score for 1 market - NEED to finish expononential trailing stop and reducing order size as order goes in our direction (hedging)
 async def create_order(market, buy_signal, sell_signal):
     # if buy_signal > sell_signal:
     #     mo = MarketOrderRequest(instrument=market, units=(buy_signal * 10000 - sell_signal * 10000))
@@ -120,7 +149,14 @@ async def create_order(market, buy_signal, sell_signal):
     market_order = oanda.request(orders.OrderCreate(accountID, data=mo.data))
     #order confirmation
     print(json.dumps(market_order, indent=4))
-    return market_order
+    #set trailing stop
+    order_id = market_order['orderFillTransaction']['orderID']
+    ordr = TrailingStopLossOrderRequest(tradeID=order_id, distance=20)
+    trailing_stop = oanda.request(orders.OrderCreate(accountID, data=ordr.data))
+    #trailing stop confimrmation
+    print(json.dumps(trailing_stop, indent=4))
+
+    return market_order, trailing_stop
 
 
 
@@ -169,46 +205,75 @@ async def double_ema(market, length):
         general_trend = 'neutral'
 
     #find candle of most recent intersection
-    emas_short = (await calc_emas(candles, 5))[-1:0:-1]
-    emas_medium = (await calc_emas(candles, 15))[-1:0:-1]
+    emas_short = (await calc_emas(candles, 5)).tolist()[-1:0:-1]
+    emas_medium = (await calc_emas(candles, 15)).tolist()[-1:0:-1]
+    emas_long = (await calc_emas(candles, 75)).tolist()[-1:0:-1]
     i = 0
     direction = ""
     for a in range(len(emas_medium)):
-        if emas_short[a + 10] < emas_medium[a]:
+        if emas_short[a] < emas_medium[a]:
             if i == 1:
                 direction = "Crossed Bearish"
-                intersect_candle = (candles[-1:0:-1])[a + 15]
-                buy_signal += 4
+                intersect_candle = (candles[-1:0:-1])[a]
+                buy_signal += 3
                 break
             i = -1
-        elif emas_short[a + 10] > emas_medium[a]:
+        elif emas_short[a] > emas_medium[a]:
             if i == -1:
                 direction = "Crossed Bullish"
-                intersect_candle = (candles[-1:0:-1])[a + 15]
-                sell_signal += 4
+                intersect_candle = (candles[-1:0:-1])[a]
+                sell_signal += 3
                 break
             i = 1
         else:
-            intersect_candle = (candles[-1:0:-1])[a + 15]
+            intersect_candle = (candles[-1:0:-1])[a]
             if i == -1:
                 direction = "Crossed Bearish"
-                buy_signal += 4
+                buy_signal += 3
                 break
             elif i == 1:
                 direction = "Crossed Bullish"
-                sell_signal += 4
+                sell_signal += 3
+                break
+    direction1 = ""
+    intersect_candle1 = []
+    for a in range(len(emas_medium)):
+        if emas_medium[a] < emas_long[a]:
+            if i == 1:
+                direction1 = "Crossed Bearish"
+                intersect_candle1 = (candles[-1:0:-1])[a]
+                buy_signal += 3
+                break
+            i = -1
+        elif emas_medium[a] > emas_long[a]:
+            if i == -1:
+                direction1 = "Crossed Bullish"
+                intersect_candle1 = (candles[-1:0:-1])[a]
+                sell_signal += 3
+                break
+            i = 1
+        else:
+            intersect_candle1 = (candles[-1:0:-1])[a]
+            if i == -1:
+                direction1 = "Crossed Bearish"
+                buy_signal += 3
+                break
+            elif i == 1:
+                direction1 = "Crossed Bullish"
+                sell_signal += 3
                 break
 
     #checks volume of intersection candle to see if "power move" is present
-    if len(intersect_candle) == 0:
-        print("No double EMA intersection found recently")
-        return None
-    candle_vol = float(intersect_candle['mid']['o']) - float(intersect_candle['mid']['c'])
-    if (candle_vol/float(intersect_candle['mid']['o'])) * 100 > 1:
+    if len(intersect_candle1) == 0:
+        print("No EMA 15 - EMA 75 intersection found recently")
+        if len(intersect_candle) == 0:
+            print('No EMA 5 - EMA 15 intersection found recently')
+            return None
+    if direction1 == direction:
         if direction == "Crossed Bullish":
-            buy_signal += 4
+            sell_signal += 2
         elif direction == "Crossed Bearish":
-            sell_signal += 4
+            buy_signal += 2
     return {
         'trend': general_trend,
         'buy_signal': buy_signal,
@@ -368,37 +433,12 @@ async def points_of_value(market, length):
 
 #Calculates EMA's for each set of candles (ie if you plot it it would be the EMA)
 async def calc_emas(candles, length):
-    emas = []
-    i = 0
-    num_first = 0
-    sum_first = 0
-    first_after_period = True
-    prev_ema = 0
-    for candle in candles[-1:0:-1]:
-        if i <= length:
-            sum_first += float(candle['mid']['c'])
-            num_first += 1
-            i += 1
-            continue
-        if first_after_period:
-            sma = sum_first/num_first
-            ema = await calc_ema(length, float(candle['mid']['c']), sma)
-            prev_ema = ema
-            emas.append(ema)
-            first_after_period = False
-        else:
-            ema = await calc_ema(length, float(candle['mid']['c']), prev_ema)
-            emas.append(ema)
-            prev_ema = ema
+    close_prices = [float(i['mid']['c']) for i in candles]
+    df = pd.Series(close_prices)
+    emas = df.ewm(span=length).mean()
     #print(emas)
     return emas
 
-
-#calculates ema for a particular candle
-async def calc_ema(length, curr_price, prev_ema):
-    weight_factor = 2/(length + 1)
-    ema = weight_factor * (curr_price - prev_ema) + prev_ema
-    return ema
 
 
 #Calculates Bollinger Bands given candlesticks
@@ -489,8 +529,8 @@ async def support_resistance(market, candles):
     data = np.array(close_prices)
     close_series = pd.Series(data)
     (minimaIdxs, pmin, mintrend, minwindows), (maximaIdxs, pmax, maxtrend, maxwindows) = trendln.calc_support_resistance(close_series)
-    fig = trendln.plot_support_resistance(close_series)
-    # plt.savefig('suppres_{}_{}.svg'.format(market, str(datetime.now())), format='svg')
+    fig = trendln.plot_support_resistance(close_series, numbest=2)
+    # plt.savefig('suppres_{}_{}.svg'.format(market, str(datetime.datetime.now())), format='svg')
     # plt.show()
     plt.clf()
     return minimaIdxs, pmin, mintrend, minwindows, maximaIdxs, pmax, maxtrend, maxwindows
