@@ -25,7 +25,7 @@ import oandapyV20.endpoints.transactions as transactions
 from oandapyV20.contrib.requests import MarketOrderRequest
 from oandapyV20.contrib.requests import TrailingStopLossOrderRequest
 import trendln
-
+import lstmpredictor
 
 #account info for live acct.
 # accountID = "001-001-4630515-001"
@@ -43,18 +43,25 @@ fee_pct = 0.0 # YESSIRRR OANDA IS FREE COMMISSION
 current = datetime.datetime.now()
 current_time = current.time()
 
-
-
-#bot start info
+#first order since bot start info
 first_order = True
-first_order_id = ""
+first_order_id = "63"
+
+#pandas dataframe where we will be logging realized P/L for all closed orders in real time
+trade_log = pd.DataFrame(
+        columns = ['_id', 'market', 'position_open_time', 'position_close_time', 'realized_pl_usd', 'realized_pl_pct', 'success']
+    )
 
 
-async def run():
-    print("Starting master strategy... \n")
+async def run(loop):
+    print("\n---------------------Starting master strategy...------------------- \n")
     await asyncio.sleep(3)
-    await asyncio.ensure_future(watchman())
-    scores_by_market = await scalp()
+    await asyncio.gather(
+            scalp(),
+            watchman()
+        )
+
+
 
 ### Master Strategy Stuff ###
 
@@ -84,11 +91,33 @@ async def scalp(order_mode=False):
         MACD_score = await MACD_strategy(market, "H1")
         ATR_score = await ATR_strategy(market, "H1")
         points_of_val_score = await points_of_value(market, "H1")
-        print("MARKET: {} \n".format(market))
+
+        ### This section is for LSTM Neural Network that will predict the next price
+        params = {
+            "count": 500,
+            "granularity": "H1"
+            }
+        candles = oanda.request(instruments.InstrumentsCandles(instrument=market, params=params))['candles']
+        df = pd.DataFrame(
+                columns=["Date", "Open", "High", "Low", "Close", "Volume"]
+            )
+        df['Date'] = [i['time'] for i in candles]
+        df['Open'] = [float(i['mid']['o']) for i in candles]
+        df['High'] = [float(i['mid']['h']) for i in candles]
+        df['Low'] = [float(i['mid']['l']) for i in candles]
+        df['Close'] = [float(i['mid']['c']) for i in candles]
+        df['Volume'] = [float(i['volume']) for i in candles]
+        print(df)
+        last_val, next_val = lstmpredictor.lstm_neural_network(df)
+        print(last_val, next_val)
+        ###
+
+        print("\nMARKET: {}".format(market))
         print("RSI score: {}".format(rsi_h1_score))
         print("double EMA score: {}".format(double_ema_score))
         print("MACD score: {}".format(MACD_score))
-        print("ATR score: {}".format(MACD_score))
+        print("ATR score: {}".format(ATR_score))
+        print("Points of Value score: {}".format(points_of_val_score))
         scores_by_market[i]['strategy_scores'].extend([rsi_h1_score, double_ema_score, MACD_score, ATR_score])
         overallscore = {}
         buy = 0
@@ -124,10 +153,37 @@ async def scalp(order_mode=False):
     return scores_by_market
 
 
-#function that watches transaction history continuosly, in parallel, to ensure nothing crazy happens. Also logs all the orders and realized/unrealized P/L
+#Watchman function watches transaction history continuosly, in parallel, to ensure nothing crazy happens. Also logs all the orders and realized/unrealized P/L.
+#UPDATE - Logging P/L complete. Need to finish alert system although with the trailing stop I dont think there will be a need.
 async def watchman():
-    #needs to be completed
-    
+    while 1:
+        params = {
+            "sinceTransactionID": int(first_order_id)
+        }
+        account_info = oanda.request(accounts.AccountChanges(accountID, params=params))
+        account_state = account_info['state']
+        account_changes = account_info['changes']
+        open_positions = account_state['positions']
+        recently_opened_positions = account_changes['tradesOpened']
+        recently_closed_positions = account_changes['tradesClosed']
+        #add recent additions to trade log
+        recent_additions = []
+        for closed_pos in recently_closed_positions:
+            if closed_pos['realizedPL'][0] == '-':
+                success = False
+            else:
+                success = True
+            pct = float(closed_pos['realizedPL'])/float(closed_pos['initialUnits'])
+            recent_additions.append([closed_pos['id'], closed_pos['instrument'], closed_pos['openTime'], str(datetime.datetime.now()), closed_pos['realizedPL'], str(pct), success])
+        for update in recent_additions:
+            update_df = pd.DataFrame(
+                    data=update,
+                    columns=['_id', 'market', 'position_open_time', 'position_close_time', 'realized_pl_usd', 'realized_pl_pct', 'success']
+                )
+            trade_log.append(update_df, ignore_index=True)
+        # print(trade_log)
+        #NEEDS TO BE DONE - Watch for huge losses, incoming margin closeout, or any other discrepencies     
+        await asyncio.sleep(3)
     pass
 
 
@@ -419,7 +475,7 @@ async def points_of_value(market, length):
         "granularity": length
     }
     candles = oanda.request(instruments.InstrumentsCandles(instrument=market, params=params))['candles']
-    await support_resistance(market, candles)
+    #await support_resistance(market, candles)
     return {
         'enter_signal': enter_signal,
         'exit_signal': exit_signal
@@ -561,6 +617,7 @@ async def ATR(market, candles, length):
 
 
 
-asyncio.get_event_loop().run_until_complete(run())
+loop = asyncio.get_event_loop()
+loop.run_until_complete(run(loop))
 if __name__ == "__main__":
         run()
