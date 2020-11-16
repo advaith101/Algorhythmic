@@ -51,7 +51,15 @@ first_order_id = "63"
 trade_log = pd.DataFrame(
         columns = ['_id', 'market', 'position_open_time', 'position_close_time', 'realized_pl_usd', 'realized_pl_pct', 'success']
     )
+#Open Positions
+open_positions = positions.OpenPositions(accountID = accountID) #OLDEST TO NEWEST TRANSACTION
+oanda.request(open_positions)
 
+#buy/sell indicator values for opening a long or short position
+long_buy = 3.5
+long_sell = 2.5
+short_buy = 2.5
+short_sell = 3.5
 
 async def run(loop):
     print("\n---------------------Starting master strategy...------------------- \n")
@@ -107,7 +115,6 @@ async def scalp(order_mode=False):
         df['Low'] = [float(i['mid']['l']) for i in candles]
         df['Close'] = [float(i['mid']['c']) for i in candles]
         df['Volume'] = [float(i['volume']) for i in candles]
-        print(df)
         last_val, next_val = lstmpredictor.lstm_neural_network(df)
         print(last_val, next_val)
         ###
@@ -139,8 +146,9 @@ async def scalp(order_mode=False):
         overallscore['buy_signal'] = buy/count
         overallscore['sell_signal'] = sell/count
         scores_by_market[i]['overall_score'] = overallscore
-        if (overallscore['buy_signal'] > 3.5 and overallscore['sell_signal'] < 2.5) or (overallscore['buy_signal'] < 2.5 and overallscore['sell_signal'] > 3.5):
-            print("\nFOUND PROFITABLE TRADE OPPORTUNITY---------------")
+        if (overallscore['buy_signal'] > long_buy and overallscore['sell_signal'] < long_sell):
+            print("\nFOUND LONG PROFITABLE TRADE OPPORTUNITY---------------")
+            buy(market, 'long', 10) #10 refers to amount of money wanted to invest
             print("OVERALL SCORE: {}".format(overallscore))
             if order_mode:
                 market_order, trailing_stop = await asyncio.ensure_future(create_order(scores_by_market[i]['market'], overallscore['buy_signal'], overallscore['sell_signal']))
@@ -149,6 +157,10 @@ async def scalp(order_mode=False):
                     first_order_id = order_id
                     first_order = False
                 await asyncio.ensure_future(watch_order(order_id))
+        elif (overallscore['buy_signal'] < short_buy and overallscore['sell_signal'] > short_sell):
+            print("\nFOUND SHORT PROFITABLE TRADE OPPORTUNITY---------------")
+            buy(market, indicators_dict, 'short')
+            print("OVERALL SCORE: {}".format(overallscore))
         i += 1
     return scores_by_market
 
@@ -192,7 +204,46 @@ async def watch_order(order_id):
     #needs to be completed
     pass
 
+def buy(market, positionType, positionSize): #positionSize in Dollars (Amount of Money Plan on Investing)
+    if (positionType == 'long'):
+        response = oanda.get_prices(instruments=market)
+        prices = response.get("prices")
+        bidding_price = prices[0].get("bid")
+        buy_units = (int) (positionSize / bidding_price);
 
+        trade_expire = datetime.utcnow() + timedelta(days=1)
+        trade_expire = trade_expire.isoformat("T") + "Z"
+        response = oanda.create_order(account_id,
+            instrument=market,
+            units=buy_units,
+            side='buy',
+            type='limit',
+            price=bidding_price,
+            expiry=trade_expire
+        )
+    else:
+        response = oanda.get_prices(instruments=market)
+        prices = response.get("prices")
+        asking_price = prices[0].get("ask")
+        sell_units = (int) (positionSize / asking_price);
+
+        trade_expire = datetime.utcnow() + timedelta(days=1)
+        trade_expire = trade_expire.isoformat("T") + "Z"
+        response = oanda.create_order(account_id,
+            instrument=market,
+            units=sell_units,
+            side='sell',
+            type='limit',
+            price=asking_price,
+            expiry=trade_expire
+        )
+
+         
+def findOpenPositionMarkets():
+    markets = []
+    for i in range(0, len(open_positions.response.get('positions'))):
+        markets.append(open_positions.response.get('positions')[i].get('instrument', 0))
+    return markets
 
 #Function to order based on overall score for 1 market - NEED to finish expononential trailing stop and reducing order size as order goes in our direction (hedging)
 async def create_order(market, buy_signal, sell_signal):
@@ -616,7 +667,7 @@ async def ATR(market, candles, length):
 
 
 
-
+open_positions_watchlist = findOpenPositionMarkets()
 loop = asyncio.get_event_loop()
 loop.run_until_complete(run(loop))
 if __name__ == "__main__":
