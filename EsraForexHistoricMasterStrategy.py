@@ -47,9 +47,19 @@ current_time = current.time()
 first_order = True
 first_order_id = "63"
 
+#here we will keep track of the most recent order id - anytime we create a new order please update this variable with the transaction ID.
+most_recent_order_id = "0"
+
 #pandas dataframe where we will be logging realized P/L for all closed orders in real time
-trade_log = pd.DataFrame(
+closed_trade_log = pd.DataFrame(
         columns = ['_id', 'market', 'position_open_time', 'position_close_time', 'realized_pl_usd', 'realized_pl_pct', 'success']
+    )
+
+#pandas dataframe where we will keep track of open trades and the price at which to close those trades. 
+#Any time we open or close a trade, we must add it here and set the open price and most recent price to the price at that moment, and set the 
+#sell price at a reasonable initial stop loss (lets just start by setting it at 5% below current price, later we can try using support/resistance and other indicators for this)
+open_trade_log = pd.DataFrame(
+        columns = ['_id', 'market', 'side', 'position_open_time', 'unrealized_pl_usd', 'open_price', 'most_recent_price', 'sell_price']
     )
 
 #global variables
@@ -62,6 +72,30 @@ try:
     async def run(loop):
         print("\n---------------------Starting master strategy...------------------- \n")
         await asyncio.sleep(3)
+        print("\n---------------------Retreiving Open Trades...------------------- \n")
+        await asyncio.sleep(1)
+        #add open trades to the open trade log and note most recent transaction
+        open_trades_request = trades.OpenTrades(accountID=accountID)
+        res = oanda.request(open_trades_request)['trades']
+        most_recent_order_id = res['lastTransactionID']
+        open_trades = res['trades']
+        for trade in open_trades:
+            side = ""
+            if trade['currentUnits'] > 0:
+                side = "LONG"
+            else:
+                side = "SHORT"
+            params = {
+                "instruments": trade['market']
+            }
+            r = pricing.PricingInfo(accountID=accountID, params=params)
+            curr_price_request = oanda.request(r)
+            curr_price = curr_price_request['prices'][0]['asks'][0]['price'] #find current min ask price
+            temp = pd.DataFrame(
+                [trade['id'], trade['instrument'], side, trade['openTime'], trade['unrealizedPL'], trade['price'], curr_price, .96*trade['price']],
+                columns = ['_id', 'market', 'side', 'position_open_time', 'unrealized_pl_usd', 'open_price', 'most_recent_price', 'sell_price']
+            )
+            open_trade_log.append(temp)
         await asyncio.gather(
                 scalp(),
                 watchman()
@@ -177,9 +211,33 @@ try:
     #Watchman function watches transaction history continuosly, in parallel, to ensure nothing crazy happens. Also logs all the orders and realized/unrealized P/L.
     #UPDATE - Logging P/L complete. Need to finish alert system although with the trailing stop I dont think there will be a need.
     async def watchman():
+                
         while 1:
+            for trade in open_trade_log:
+                if trade['sell_price'] == None:
+                    #todo - set sell price at initial level of a 1% loss.
+                    sell_price = .99 * trade['open_price']
+                else:
+                    params = {
+                        "instruments": trade['market']
+                    }
+                    r = pricing.PricingInfo(accountID=accountID, params=params)
+                    curr_price_request = oanda.request(r)
+                    curr_price = curr_price_request['prices'][0]['asks'][0]['price'] #find current min ask price
+                    if trade['side'] == "LONG":
+                        if curr_price > trade['most_recent_price']:
+                            new_sell_price = trade['sell_price'] + (curr_price - trade['most_recent_price'])
+                            new_sell_price += 0.4 * (curr_price - new_sell_price) # 0.4 is the weighting factor for our ETS
+                            #TODO - need to update sell price in the dataframe.
+                    else:
+                        if curr_price < trade['most_recent_price']:
+                            new_sell_price = trade['sell_price'] + (curr_price - trade['most_recent_price'])
+                            new_sell_price += 0.4 * (curr_price - new_sell_price) # 0.4 is the weighting factor for our ETS
+                            #TODO - need to update sell price in the dataframe.
+                        
+
             params = {
-                "sinceTransactionID": int(first_order_id)
+                "sinceTransactionID": int(most_recent_order_id)
             }
             account_info = oanda.request(accounts.AccountChanges(accountID, params=params))
             account_state = account_info['state']
@@ -201,8 +259,11 @@ try:
                         data=update,
                         columns=['_id', 'market', 'position_open_time', 'position_close_time', 'realized_pl_usd', 'realized_pl_pct', 'success']
                     )
-                trade_log.append(update_df, ignore_index=True)
-            # print(trade_log)
+                closed_trade_log.append(update_df, ignore_index=True)
+
+            for opened_trade in recently_opened_positions:
+
+            # print(closed_trade_log)
             #NEEDS TO BE DONE - Watch for huge losses, incoming margin closeout, or any other discrepencies
             await asyncio.sleep(3)
         pass
@@ -647,6 +708,6 @@ except:
 
 finally:
     with open('HistoricalForexMasterStrategyLog.csv', 'a') as f:
-        df.to_csv(trade_log, sep='\t', index = False, header=f.tell()==0)
+        df.to_csv(closed_trade_log, sep='\t', index = False, header=f.tell()==0)
 
     
