@@ -225,11 +225,17 @@ try:
                     curr_price_request = oanda.request(r)
                     curr_price = curr_price_request['prices'][0]['asks'][0]['price'] #find current min ask price
                     if trade['side'] == "LONG":
+                        if curr_price <= trade['sell_price']:
+                            #CALL SELL() FUNCTION HERE
+                            continue
                         if curr_price > trade['most_recent_price']:
                             new_sell_price = trade['sell_price'] + (curr_price - trade['most_recent_price'])
                             new_sell_price += 0.4 * (curr_price - new_sell_price) # 0.4 is the weighting factor for our ETS
                             #TODO - need to update sell price in the dataframe.
                     else:
+                        if curr_price >= trade['sell_price']:
+                            #CALL SELL() FUNCTION HERE
+                            continue
                         if curr_price < trade['most_recent_price']:
                             new_sell_price = trade['sell_price'] + (curr_price - trade['most_recent_price'])
                             new_sell_price += 0.4 * (curr_price - new_sell_price) # 0.4 is the weighting factor for our ETS
