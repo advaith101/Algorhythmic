@@ -267,8 +267,6 @@ try:
                     )
                 closed_trade_log.append(update_df, ignore_index=True)
 
-            for opened_trade in recently_opened_positions:
-
             # print(closed_trade_log)
             #NEEDS TO BE DONE - Watch for huge losses, incoming margin closeout, or any other discrepencies
             await asyncio.sleep(3)
