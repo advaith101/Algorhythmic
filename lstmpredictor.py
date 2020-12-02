@@ -34,7 +34,7 @@ def lstm_neural_network(historical_data):
 	plt.plot(obs, HLC_avg, 'b', label = 'HLC avg')
 	plt.plot(obs, close_val, 'g', label = 'Closing price')
 	plt.legend(loc = 'upper right')
-	plt.show()
+	# plt.show()
 
 	# PREPARATION OF TIME SERIES DATASE
 	OHLC_avg = np.reshape(OHLC_avg.values, (len(OHLC_avg),1)) # 1664
@@ -107,7 +107,7 @@ def lstm_neural_network(historical_data):
 	plt.legend(loc = 'upper right')
 	plt.xlabel('Time in Days')
 	plt.ylabel('OHLC Value of Apple Stocks')
-	plt.show()
+	# plt.show()
 
 	# PREDICT FUTURE VALUES
 	last_val = testPredict[-1]
