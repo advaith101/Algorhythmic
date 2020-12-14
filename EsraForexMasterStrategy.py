@@ -216,7 +216,8 @@ async def watchman():
                 curr_price = curr_price_request['prices'][0]['asks'][0]['price'] #find current min ask price
                 if trade['side'] == "LONG":
                     if curr_price <= trade['sell_price']:
-                        #CALL SELL() FUNCTION HERE
+                        #long close position
+                        closePosition(trade['market'], trade['side'])
                         continue
                     if curr_price > trade['most_recent_price']:
                         new_sell_price = trade['sell_price'] + (curr_price - trade['most_recent_price'])
@@ -224,7 +225,8 @@ async def watchman():
                         #TODO - need to update sell price in the dataframe.
                 else:
                     if curr_price >= trade['sell_price']:
-                        #CALL SELL() FUNCTION HERE
+                        #short close position
+                        closePosition(trade['market'], trade['side'])
                         continue
                     if curr_price < trade['most_recent_price']:
                         new_sell_price = trade['sell_price'] + (curr_price - trade['most_recent_price'])
@@ -302,7 +304,22 @@ def buy(market, positionType, positionSize): #positionSize in Dollars (Amount of
             expiry=trade_expire
         )
 
-         
+def closePosition(market, positionType):
+    data = None;
+    if (positionType.toLower() == 'long'):
+        data = {
+            'longUnits': "ALL"
+        }
+    else:
+        data = {
+            'shortUnits': "ALL"
+        }
+    r = positions.PositionClose(accountID = accountID,
+                                instrument = market,
+                                data = data)
+    client.request(r)
+    print(positionType.upper() + " position for " + market + " has been closed")
+
 def findOpenPositionMarkets():
     markets = []
     for i in range(0, len(open_positions.response.get('positions'))):
