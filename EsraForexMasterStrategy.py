@@ -79,26 +79,29 @@ async def run(loop):
     await asyncio.sleep(1)
     #add open trades to the open trade log and note most recent transaction
     open_trades_request = trades.OpenTrades(accountID=accountID)
-    res = oanda.request(open_trades_request)['trades']
+    res = oanda.request(open_trades_request)
+    print("RESPONSE: \n {}".format(res))
     most_recent_order_id = res['lastTransactionID']
     open_trades = res['trades']
     for trade in open_trades:
         side = ""
-        if trade['currentUnits'] > 0:
+        if float(trade['currentUnits']) > 0:
             side = "LONG"
         else:
             side = "SHORT"
         params = {
-            "instruments": trade['market']
+            "instruments": trade['instrument']
         }
         r = pricing.PricingInfo(accountID=accountID, params=params)
         curr_price_request = oanda.request(r)
         curr_price = curr_price_request['prices'][0]['asks'][0]['price'] #find current min ask price
-        temp = pd.DataFrame(
-            [trade['id'], trade['instrument'], side, trade['openTime'], trade['unrealizedPL'], trade['price'], curr_price, .96*trade['price']],
-            columns = ['_id', 'market', 'side', 'position_open_time', 'unrealized_pl_usd', 'open_price', 'most_recent_price', 'sell_price']
-        )
-        open_trade_log.append(temp)
+        t = [trade['id'], trade['instrument'], side, trade['openTime'], trade['unrealizedPL'], trade['price'], curr_price, .96*float(trade['price'])]
+        print(t)
+        # temp = pd.DataFrame(
+        #     t,
+        #     columns = ['_id', 'market', 'side', 'position_open_time', 'unrealized_pl_usd', 'open_price', 'most_recent_price', 'sell_price']
+        # )
+        open_trade_log.append(t)
     await asyncio.gather(
             scalp(),
             watchman()
