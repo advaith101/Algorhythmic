@@ -272,43 +272,33 @@ async def find_tri_arb_opp(exchange, total_markets, arb_list, fee_percentage = .
     return arbitrage
 
 async def maxBid(exchange, market, total_markets, count, min_USD_for_trade=50):
-    await exchange.load_markets() #SHOULD BE CHANGED
+    orderBook = await requests.get("https://trade.mandala.exchange/open/v1/market/depth?symbol=" + market)
     price_quantity = {}
     finalmarket = ''
-    USDmarket = market[0:3] + "/USD"
-    USDCmarket = market[0:3] + "/USDC"
-    USDTmarket = market[0:3] + "/USDT"
+    USDTmarket = market[0:3] + "_USDT"
     dollar_exchrate = 0.0
     min_quantity = 0.0
     try:
-        if count == 0:
-            USDmarket = market[0:3] + "/BUSD"
-            if USDmarket in exchange.symbols:
-                USDdepth = await exchange.fetch_order_book(symbol=USDmarket) #SHOULD BE CHANGED
-                dollar_exchrate = USDdepth['bids'][0][0]
-                min_quantity = float(min_USD_for_trade/(USDdepth['bids'][0][0]))
-            else:
-                price_quantity = {
-                    'bid_price': 0,
-                    'bid_quantity': 0,
-                    'isFound': False,
-                    'dollar_exchrate': dollar_exchrate
-                }
-                print("Cannot find compatible BUSD market")
-                return price_quantity
+        USDTorderBook = await requests.get("https://trade.mandala.exchange/open/v1/market/depth?symbol=" + USDTmarket)
+        USDTorderBookJson = USDTorderBook.json()
+        USDTdepth = USDTorderBookJson['data']
+        dollar_exchrate = USDTdepth['bids'][0][0]
+        min_quantity = float(min_USD_for_trade/(dollar_exchrate))
     except:
-        print('has no bids for USDC/USDT/USD')
+        print('has no bids for USDT')
     try:
-        depth = await exchange.fetch_order_book(symbol=market) #SHOULD BE CHANGED
+        orderBookJson = orderBook.json()
+        depth = orderBookJson['data']
         for bid in depth['bids']:
             if bid[1] > min_quantity:
                 rounded_bid_price = float(bid[0])
                 rounded_bid_quantity = float(bid[1])
-                isCorrect = False
-                ticker = await exchange.fetch_ticker(symbol=market) #SHOULD BE CHANGED
-                average = (ticker['high'] + ticker['low']) / 2
-                if (abs(average - rounded_bid_price) < (average * percentUncertaintyOverAverage)):
-                    isCorrect = True
+                isCorrect = True #setting it to true
+                #Not needed
+                # ticker = await exchange.fetch_ticker(symbol=market) #SHOULD BE CHANGED
+                # average = (ticker['high'] + ticker['low']) / 2 #this as well
+                # if (abs(average - rounded_bid_price) < (average * percentUncertaintyOverAverage)):
+                #     isCorrect = True
                 price_quantity = {
                     'bid_price': rounded_bid_price,
                     'bid_quantity': rounded_bid_quantity,
@@ -336,46 +326,32 @@ async def maxBid(exchange, market, total_markets, count, min_USD_for_trade=50):
         return price_quantity
 
 async def minAsk(exchange, market, total_markets, min_USD_for_trade = 50):
-    await exchange.load_markets() #SHOULD BE CHANGED
+    orderBook = await requests.get("https://trade.mandala.exchange/open/v1/market/depth?symbol=" + market)
     price_quantity = {}
     finalmarket = ''
     min_quantity = 0.0
-    USDmarket = market[0:3] + "/USD"
-    USDCmarket = market[0:3] + "/USDC"
-    USDTmarket = market[0:3] + "/USDT"
-    BUSDmarket = market[0:3] + "/BUSD"
+    USDTmarket = market[0:3] + "_USDT"
     try:
-        if USDmarket in total_markets:
-            finalmarket = USDmarket
-            USDdepth = await exchange.fetch_order_book(symbol=finalmarket) #SHOULD BE CHANGED
-            min_quantity = float(min_USD_for_trade/(USDdepth['asks'][0][0]))
-        elif USDCmarket in total_markets:
-            finalmarket = USDCmarket
-            USDdepth = await exchange.fetch_order_book(symbol=finalmarket) #SHOULD BE CHANGED
-            min_quantity = float(min_USD_for_trade/(USDdepth['asks'][0][0]))
-        elif USDTmarket in total_markets:
-            finalmarket = USDTmarket
-            USDdepth = await exchange.fetch_order_book(symbol=finalmarket) #SHOULD BE CHANGED
-            min_quantity = float(min_USD_for_trade/(USDdepth['asks'][0][0]))
-        elif BUSDmarket in total_markets:
-            finalmarket = USDTmarket
-            USDdepth = await exchange.fetch_order_book(symbol=finalmarket) #SHOULD BE CHANGED
-            min_quantity = float(min_USD_for_trade/(USDdepth['asks'][0][0]))
-        else:
-            print("Cannot find compatible USD/USDC/USDT market")
+        USDTorderBook = await requests.get("https://trade.mandala.exchange/open/v1/market/depth?symbol=" + USDTmarket)
+        USDTorderBookJson = USDTorderBook.json()
+        USDTdepth = USDTorderBookJson['data']
+        dollar_exchrate = USDTdepth['asks'][0][0]
+        min_quantity = float(min_USD_for_trade/(dollar_exchrate))
     except:
-        print('has no asks for USDC/USDT/USD')
+        print('has no asks for USDT')
     try:
-        depth = await exchange.fetch_order_book(symbol = market) #SHOULD BE CHANGED
+        orderBookJson = orderBook.json()
+        depth = orderBookJson['data']
         for ask in depth['asks']:
             if ask[1] > min_quantity:
                 rounded_ask_price = float(ask[0])
                 rounded_ask_quantity = float(ask[1])
-                isCorrect = False
-                ticker = await exchange.fetch_ticker(symbol=market) #SHOULD BE CHANGED
-                average = (ticker['high'] + ticker['low']) / 2
-                if (abs(average - rounded_ask_price) < (average * percentUncertaintyOverAverage)):
-                    isCorrect = True
+                isCorrect = True #setting it to true
+                #Not needed
+                # ticker = await exchange.fetch_ticker(symbol=market) #SHOULD BE CHANGED
+                # average = (ticker['high'] + ticker['low']) / 2 #This too
+                # if (abs(average - rounded_ask_price) < (average * percentUncertaintyOverAverage)):
+                #     isCorrect = True
                 price_quantity = {
                     'ask_price': rounded_ask_price,
                     'ask_quantity': rounded_ask_quantity,

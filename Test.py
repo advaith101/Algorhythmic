@@ -1,4 +1,5 @@
 import csv
+import asyncio
 import datetime
 import random
 # import oandapyV20.endpoints.accounts as accounts
@@ -15,8 +16,18 @@ symbols = []
 for singleMarket in marketsJson['data']['list']:
     symbols.append(singleMarket['symbol'])
 
-print(symbols)
 
+orderBook = requests.get("https://trade.mandala.exchange/open/v1/market/depth?symbol=" + "MDX_USDT")
+orderBookJson = orderBook.json()
+depth = orderBookJson['data']
+for bid in depth['bids']:
+    print(bid[0])
+
+USDTorderBook = requests.get("https://trade.mandala.exchange/open/v1/market/depth?symbol=" + 'BTC_USDT')
+USDTorderBookJson = USDTorderBook.json()
+USDTdepth = USDTorderBookJson['data']
+dollar_exchrate = USDTdepth['bids'][0][0]
+print(dollar_exchrate)
 
 
 
