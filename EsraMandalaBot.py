@@ -307,8 +307,8 @@ async def maxBid(exchange, market, total_markets, count, min_USD_for_trade=50):
                 }
                 return price_quantity
         price_quantity = {
-            'bid_price': rounded_bid_price,
-            'bid_quantity': rounded_bid_quantity,
+            'bid_price': orderBookJson['data']['bids'][0][0],
+            'bid_quantity': orderBookJson['data']['bids'][0][1],
             'isFound': False,
             'dollar_exchrate': dollar_exchrate
         }
