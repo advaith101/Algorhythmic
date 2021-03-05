@@ -70,7 +70,7 @@ async def config_arbitrages():
             # print('hello')
             if j >= 1:
                 if len(arb_list) > 1:
-                    final = arb_list[0].split('/')[1] + '/' + str(arb_list[1].split('/')[1])
+                    final = arb_list[0].split('_')[1] + '_' + str(arb_list[1].split('_')[1])
                     # print(final)
                     # if final in symbols:
                     arb_list.append(final)
@@ -86,7 +86,7 @@ async def config_arbitrages():
                 else:
                     if j % 2 == 0:
                         # print("{} , {}".format(arb_list[j][0:3], sym[0:3]))
-                        if arb_list[j].split('/')[0] == sym.split('/')[0]:
+                        if arb_list[j].split('_')[0] == sym.split('_')[0]:
                             if arb_list[j] == sym:
                                 pass
                             else:
@@ -375,7 +375,7 @@ async def minAsk(exchange, market, total_markets, min_USD_for_trade = 50):
 
 async def pre_tri_arb_USD_transfer(exchange, sym_list, fee_percentage, initial_quantity): #make exchange, exch_rate_list, sym_list, fee_percentage global vars
     market1 = sym_list[0]
-    USDmarket = market1[0:3] + "/BUSD"
+    USDmarket = market1[0:3] + "_BUSD"
     print("Transferring capital in USDC to " + market1)
     try:
         depth = await exchange.fetch_order_book(symbol = USDmarket) #SHOULD BE CHANGED
