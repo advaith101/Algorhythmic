@@ -141,7 +141,7 @@ async def execute_all_tri_arb_orders(list_of_lists_of_arb_lists):
                         profit_dollars_list.append(arbitrageopp['profit_in_dollars'])
                         market_depth_dollars_list.appned(arbitrageopp['market_depth_dollars'])
                         quantity_list = arbitrageopp['quantity_list']
-                        quantity_3 = tri_arb_orders(arbitrageopp['exchange'], arbitrageopp['exch_rate_list'], arbitrageopp['sym_list'], arbitrageopp['quantity_list'], arbitrageopp['fee_percentage'])
+                        quantity_3 = await tri_arb_orders(arbitrageopp['exchange'], arbitrageopp['exch_rate_list'], arbitrageopp['sym_list'], arbitrageopp['quantity_list'], arbitrageopp['fee_percentage'])
                         await post_tri_arb_USD_transfer(arbitrageopp['exchange'],  arbitrageopp['sym_list'], arbitrageopp['fee_percentage'], quantity_3)
                     else:
                         profit_spread_list.append(arbitrageopp['profit'])
@@ -149,7 +149,7 @@ async def execute_all_tri_arb_orders(list_of_lists_of_arb_lists):
                         market_depth_dollars_list.appned(arbitrageopp['market_depth_dollars'])
                         quantity_list = arbitrageopp['quantity_list']
                         await pre_tri_arb_USD_transfer(arbitrageopp['exchange'], arbitrageopp['sym_list'], arbitrageopp['fee_percentage'], quantity_list[0])
-                        quantity_3 = tri_arb_orders(arbitrageopp['exchange'], arbitrageopp['exch_rate_list'], arbitrageopp['sym_list'], arbitrageopp['quantity_list'], arbitrageopp['fee_percentage'])
+                        quantity_3 = await tri_arb_orders(arbitrageopp['exchange'], arbitrageopp['exch_rate_list'], arbitrageopp['sym_list'], arbitrageopp['quantity_list'], arbitrageopp['fee_percentage'])
                         await post_tri_arb_USD_transfer(arbitrageopp['exchange'],  arbitrageopp['sym_list'], arbitrageopp['fee_percentage'], quantity_3)
                         print("\nOrdering should be complete by this point\n")
             except:
@@ -396,58 +396,76 @@ async def pre_tri_arb_USD_transfer(exchange, sym_list, fee_percentage, initial_q
     except:
         print("Market Not Found")
 
-def tri_arb_orders(exchange, exch_rate_list, sym_list, quantity_list, fee_percentage): #exch_rate_list is the exchange rates for the tri arb, sym_list are the 3 markets in the tri arb
+#NOTE: MADE TRI_ARB_ORDERING AN ASYNC FUNCTION
+async def tri_arb_orders(exchange, exch_rate_list, sym_list, quantity_list, fee_percentage): #exch_rate_list is the exchange rates for the tri arb, sym_list are the 3 markets in the tri arb
     # Place 3 orders in succession buying/selling coins for the tri arb
     print("PLACING ORDER")
     #First Order - Coin 2 from Starting Coin -
     price_order_1 = round(float(exch_rate_list[int(0)]),amount_digits_rounded)
     initial_quantity_traded = quantity_list[0]
-    if exchange.has['createMarketOrder']: #SHOULD BE CHANGED
-        order_1 = exchange.create_order (symbol=sym_list[0], #SHOULD BE CHANGED
-                        side=SIDE_SELL,
-                        type=ORDER_TYPE_LIMIT,
-                        quantity=initial_quantity_traded,
-                        price=price_order_1,
-                        timeInForce=TIME_IN_FORCE_GTC)
-    else:
-        print("Could not complete order.")
-    checkForOpenOrder(exchange, sym_list[0])
+    order1 = await createLimitOrder(sym_list[0], 'SELL', initial_quantity_traded, price_order_1)
+    # if exchange.has['createMarketOrder']: #SHOULD BE CHANGED
+    #     order_1 = exchange.create_order (symbol=sym_list[0], #SHOULD BE CHANGED
+    #                     side=SIDE_SELL,
+    #                     type=ORDER_TYPE_LIMIT,
+    #                     quantity=initial_quantity_traded,
+    #                     price=price_order_1,
+    #                     timeInForce=TIME_IN_FORCE_GTC)
+    # else:
+    #     print("Could not complete order.")
+    checkForOpenOrder(order1['orderId'])
     #Second Order - Coin 3 from Coin 2 -
     price_order_2 = round(1/exch_rate_list[int(1)], amount_digits_rounded)
     non_fee_adjusted_quantity_2 = initial_quantity_traded/exch_rate_list[0]
     totalprice_1 = non_fee_adjusted_quantity_2 * exch_rate_list[0]
     fee_adjusted_quantity_2 = round((totalprice - (totalprice * fee_percentage)) / exch_rate_list[0], amount_digits_rounded)
-    if exchange.has['createMarketOrder']: #SHOULD BE CHANGED
-        order_2 = exchange.create_order (symbol=sym_list[1], #SHOULD BE CHANGED
-                        side=SIDE_BUY,
-                        type=ORDER_TYPE_LIMIT,
-                        quantity=fee_adjusted_quantity_2,
-                        price=price_order_2,
-                        timeInForce=TIME_IN_FORCE_GTC)
-    else:
-        print("Could not complete order.")
-    checkForOpenOrder(exchange, sym_list[1])
+    order2 = await createLimitOrder(sym_list[1], 'BUY', fee_adjusted_quantity_2, price_order_2)
+    # if exchange.has['createMarketOrder']: #SHOULD BE CHANGED
+    #     order_2 = exchange.create_order (symbol=sym_list[1], #SHOULD BE CHANGED
+    #                     side=SIDE_BUY,
+    #                     type=ORDER_TYPE_LIMIT,
+    #                     quantity=fee_adjusted_quantity_2,
+    #                     price=price_order_2,
+    #                     timeInForce=TIME_IN_FORCE_GTC)
+    # else:
+    #     print("Could not complete order.")
+    checkForOpenOrder(order2['orderId'])
     #Third Order - Starting Coin from Coin 3 -
     price_order_3 = round(float(exch_rate_list[int(2)]),amount_digits_rounded)
     non_fee_adjusted_quantity_3 = fee_adjusted_quantity_2/exch_rate_list[1]
     totalprice_2 = non_fee_adjusted_quantity_3 * exch_rate_list[1]
     fee_adjusted_quantity_3 = round((totalprice_2 - (totalprice_2 * fee_percentage)) / exch_rate_list[1], amount_digits_rounded)
-    if exchange.has['createMarketOrder']: #SHOULD BE CHANGED
-        order_3 = exchange.create_order (symbol=sym_list[2], #SHOULD BE CHANGED
-                        side=SIDE_SELL,
-                        type=ORDER_TYPE_LIMIT,
-                        quantity=fee_adjusted_quantity_3,
-                        price=price_order_3,
-                        timeInForce=TIME_IN_FORCE_GTC)
-    else:
-        print("Could not complete order.")
-    checkForOpenOrder(exchange, sym_list[2])
+    order3 = await createLimitOrder(sym_list[2], 'SELL', fee_adjusted_quantity_3, price_order_3)
+    # if exchange.has['createMarketOrder']: #SHOULD BE CHANGED
+    #     order_3 = exchange.create_order (symbol=sym_list[2], #SHOULD BE CHANGED
+    #                     side=SIDE_SELL,
+    #                     type=ORDER_TYPE_LIMIT,
+    #                     quantity=fee_adjusted_quantity_3,
+    #                     price=price_order_3,
+    #                     timeInForce=TIME_IN_FORCE_GTC)
+    # else:
+    #     print("Could not complete order.")
+    checkForOpenOrder(order3['orderId'])
     return fee_adjusted_quantity_3
+
+async def createLimitOrder(symbol, side, quantity, price):
+    enumSide = 0
+    if (side == 'SELL'):
+        enumSide = 1
+    data1 = {
+        'symbol': symbol,
+        'side': enumSide, #1 should be sell
+        'type': 1,
+        'quantity': str(quantity), #supposed to be string?
+        'price': str(price),
+        'timestamp': int(round(time.time() * 1000)) #current time
+    }
+    r = await requests.post('https://trade.mandala.exchange/open/v1/orders/', data=data1)
 
 async def post_tri_arb_USD_transfer(exchange,  sym_list, fee_percentage, quantity_3):
     market1 = sym_list[0]
-    USDmarket = market1[0:3] + "/USDC"
-    print("Transfering capital in " + USDmarket + " to USDC")
+    USDmarket = market1[0:3] + "/USDT"
+    print("Transfering capital in " + USDmarket + " to USDT")
     depth = await exchange.fetch_order_book(symbol = USDmarket) #SHOULD BE CHANGED
     USD_buy_exch_rate = round(await minAsk(exchange, market1) ['ask_price'])
     non_fee_adjusted_quantity = quantity_3 / USD_buy_exch_rate
@@ -486,14 +504,14 @@ async def compute_avg_spread(profit_spread_list, profit_dollars_list, market_dep
     except:
         print("found no profitable spreads!")
 
-def checkForOpenOrder(exchange, market):
+def checkForOpenOrder(orderId):
     isOpenOrder = True
-    check = exchange.fetchOpenOrders(symbol= market) #SHOULD BE CHANGED
+    check = requests.get('https://trade.mandala.exchange/open/v1/orders/detail', {'orderId': orderId, 'timestamp': int(round(time.time() * 1000))})
     while isOpenOrder:
-        if (len(check) == 0):
+        if (check['message'] == 'success'):
             isOpenOrder = False
         time.sleep(5)
-        check = exchange.fetchOpenOrders(symbol= market) #SHOULD BE CHANGED
+        check = requests.get('https://trade.mandala.exchange/open/v1/orders/detail', {'orderId': orderId, 'timestamp': int(round(time.time() * 1000))})
         print(check)
     print("Order is Complete")
 
