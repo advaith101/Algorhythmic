@@ -375,23 +375,24 @@ async def minAsk(exchange, market, total_markets, min_USD_for_trade = 50):
 
 async def pre_tri_arb_USD_transfer(exchange, sym_list, fee_percentage, initial_quantity): #make exchange, exch_rate_list, sym_list, fee_percentage global vars
     market1 = sym_list[0]
-    USDmarket = market1[0:3] + "_BUSD"
-    print("Transferring capital in USDC to " + market1)
+    USDmarket = market1[0:3] + "_USDT"
+    print("Transferring capital in USDT to " + market1)
     try:
         depth = await exchange.fetch_order_book(symbol = USDmarket) #SHOULD BE CHANGED
         USD_sell_exch_rate = round(await maxBid(exchange, market1) ['bid_price']) #is this the highest volume in the bid order book... should it be a limit or market order?
         non_fee_adjusted_quantity = initial_quantity/USD_sell_exch_rate
         totalprice = non_fee_adjusted_quantity * USD_sell_exch_rate
         fee_adjusted_quantity = (totalprice + (totalprice * fee_percentage)) / USD_sell_exch_rate
-        if exchange.has['createMarketOrder']: #SHOULD BE CHANGED
-            pre_USD_transfer_order = exchange.create_order(symbol=USDmarket, #SHOULD BE CHANGED
-                        side=SIDE_SELL,
-                        type=ORDER_TYPE_LIMIT,
-                        quantity=fee_adjusted_quantity, #compensating for fees so we receive the correct quantity_1
-                        price=USD_sell_exch_rate,
-                        timeInForce=TIME_IN_FORCE_GTC)
-        else:
-            print("Could not complete order.")
+        preorder = await createLimitOrder(USDmarket, 'SELL', fee_adjusted_quantity, USD_sell_exch_rate)
+        # if exchange.has['createMarketOrder']: #SHOULD BE CHANGED
+        #     pre_USD_transfer_order = exchange.create_order(symbol=USDmarket, #SHOULD BE CHANGED
+        #                 side=SIDE_SELL,
+        #                 type=ORDER_TYPE_LIMIT,
+        #                 quantity=fee_adjusted_quantity, #compensating for fees so we receive the correct quantity_1
+        #                 price=USD_sell_exch_rate,
+        #                 timeInForce=TIME_IN_FORCE_GTC)
+        # else:
+        #     print("Could not complete order.")
         checkForOpenOrder(exchange, sym_list[0])
     except:
         print("Market Not Found")
@@ -470,16 +471,17 @@ async def post_tri_arb_USD_transfer(exchange,  sym_list, fee_percentage, quantit
     USD_buy_exch_rate = round(await minAsk(exchange, market1) ['ask_price'])
     non_fee_adjusted_quantity = quantity_3 / USD_buy_exch_rate
     totalprice = non_fee_adjusted_quantity * USD_buy_exch_rate
-    fee_adjusted_quantity = (totalprice - (totalprice * fee_percentage)) / USD_sell_exch_rate
-    if exchange.has['createMarketOrder']: #SHOULD BE CHANGED
-        post_USD_transfer_order = exchange.create_order(symbol=USDmarket, #SHOULD BE CHANGED
-                        side=SIDE_BUY,
-                        type=ORDER_TYPE_LIMIT,
-                        quantity=quantity_3,
-                        price=(1/USD_buy_exch_rate),
-                        timeInForce=TIME_IN_FORCE_GTC)
-    else:
-        print("Could not complete order.")
+    fee_adjusted_quantity = (totalprice - (totalprice * fee_percentage)) / USD_buy_exch_rate
+    order1 = await createLimitOrder(USDmarket, 'BUY', fee_adjusted_quantity, USD_buy_exch_rate) #is price the exch rate or 1/exch rate?
+    # if exchange.has['createMarketOrder']: #SHOULD BE CHANGED
+    #     post_USD_transfer_order = exchange.create_order(symbol=USDmarket, #SHOULD BE CHANGED
+    #                     side=SIDE_BUY,
+    #                     type=ORDER_TYPE_LIMIT,
+    #                     quantity=quantity_3,
+    #                     price=(1/USD_buy_exch_rate),
+    #                     timeInForce=TIME_IN_FORCE_GTC)
+    # else:
+    #     print("Could not complete order.")
 
 
 async def compute_avg_spread(profit_spread_list, profit_dollars_list, market_depth_dollars_list):
